@@ -80,7 +80,8 @@
     // ----- 아이템·재료 작업: 서버 모드면 서버가 판정 (같은 inventory.js 규칙), 아니면 기기 엔진 -----
     const equippedIds = () => Object.values(E.S.equipped).filter((x) => Number.isInteger(x));
     // 재산(원)은 서버 진행 장부가 원본 (3단계) → 보내지 않음. 응답의 prog(서버 재산·레벨)로 맞춤
-    const invBody = (extra) => ({ equipped: equippedIds(), auto: E.S.autoAppraise, ...extra });
+    const keptIds = () => [...new Set([...equippedIds(), ...Object.values(E.S.presetAlt || {}).filter((x) => Number.isInteger(x))])];
+    const invBody = (extra) => ({ equipped: keptIds(), auto: E.S.autoAppraise, ...extra });
     // 서버 응답 반영: 아이템·재화 + 재산·근로 강화는 서버 값(prog) + 아직 확정 안 된 내 기록 (r.gold 증감은 안 씀)
     function applyR(r) {
       if (!r || typeof r !== 'object') return;

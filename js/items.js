@@ -52,36 +52,119 @@
   const MAIN_BASE = [5, 12, 25, 50, 100, 200];
   const MAIN_PLUS_STEP = 0.1;
 
-  // ----- 4. 종류 (부위당 3종) [임시 이름]. subs = 서브 능력치 2개 -----
-  const TYPE_SUBS = {
-    keyboard: [['critRate', 'aspd'], ['hp', 'regen'], ['boss', 'critDmg']],
-    mouse: [['atk', 'critRate'], ['cdr', 'regen'], ['gold', 'offline']],
-    monitor: [['critDmg', 'atk'], ['hp', 'cdr'], ['boss', 'aspd']],
-    chair: [['atk', 'boss'], ['regen', 'offline'], ['gold', 'critDmg']],
-    badge: [['atk', 'critDmg'], ['offline', 'hp'], ['boss', 'aspd']],
-    watch: [['aspd', 'critRate'], ['regen', 'offline'], ['boss', 'gold']],
-    ring: [['critRate', 'atk'], ['hp', 'regen'], ['boss', 'gold']],
+  // ----- 4. 테마 6개 × 부위 7개 = 42종 (구글 시트 '시스템표' 아이템 탭, 2026-11-05) -----
+  // 종류 id = 부위 + 테마 번호(1~6). 예전 1~3번(keyboard1~3)은 id 그대로 → 세이브 안전
+  // subs = 서브 2개 (테마가 정함, 시트 K·L열). 주 능력치와 겹치는 9칸은 시트대로 겹침(그 능력치 몰아주기) [⚖]
+  const THEMES = [
+    { key: 'saver', name: '짠돌이', subs: ['gold', 'offline'], tip: '재산·방치' },
+    { key: 'ergo', name: '인체공학', subs: ['hp', 'regen'], tip: '버티기' },
+    { key: 'gaming', name: '게이밍', subs: ['aspd', 'critRate'], tip: '빠른 처리' },
+    { key: 'luxury', name: '고오급', subs: ['critDmg', 'gold'], tip: '치명타 한 방' },
+    { key: 'power', name: '권력이 최고', subs: ['boss', 'atk'], tip: '보스전' },
+    { key: 'overtime', name: '야근 전문가', subs: ['cdr', 'offline'], tip: '방치·스킬' },
+  ];
+  // [이름, 한 줄 설명] — 테마 순서 (시트 F·G열)
+  const TYPE_TEXT = {
+    keyboard: [
+      ['찌든 멤브레인', '언제부터 쓰던건지 모르겠는 키보드다..'],
+      ['인체공학의 끝판왕', '왠지 손목이 건강해질거같다.'],
+      ['시끄러운 청축', '소리가 커서 눈치보이지만....난 mz인걸?'],
+      ['금색 키캡의 키보드', '황금 코팅 덕분에 타건감이 묵직해'],
+      ['최종 결재 버튼', '키보드 옆에 결재 버튼이 있네?'],
+      ['무소음 키보드', '새벽에 쳐도 아무도 깨지 않는 키보드'],
+    ],
+    mouse: [
+      ['다있소 마우스', '다있소에서 3천원에 파는 마우스'],
+      ['옆으로 버티컬', '손목 터널 증후군은 안생길듯..'],
+      ['페익허 마우스', '움직이는 속도와 클릭속도가 굉장하다'],
+      ['다이아 휠 마우스', '휠을 돌릴 때마다 보석이 반짝이며 영롱해요'],
+      ['지시용 포인터', '마우스가 가는 곳에 모든 인력이 투입 !'],
+      ['무소음 마우스', '클릭 했게~? 안했게~?'],
+    ],
+    monitor: [
+      ['고장난 모니터', '모니터의 절반이 안보인다..'],
+      ['높낮이 조절 모니터', '화면을 눈높이에 맞춰 거북목을 막아요'],
+      ['165Hz 디스플레이', '움직임이 너무 매끄러워 눈이 즐거운 화면'],
+      ['주식 고수의 모니터', '화면 4개로 주식을 하면 나도 부자가 될까..?'],
+      ['전용 관제탑', '전 사원의 업무 현황을 한눈에 감시 가능'],
+      ['각성 블루라이트', '밤새 봐도 눈이 아프지 않아'],
+    ],
+    chair: [
+      ['접이식 철제 의자', '30분만 앉아도 허리가 끊어질 듯한 철제 의자'],
+      ['척추 지킴이 의자', '나의 허리 중요하지...바른 자세 !'],
+      ['화려한 레이싱 의자', '서킷을 달리는 기분으로 업무를 질주해요'],
+      ['명품 디자이너 의자', '앉아만 있어도 성공한 기분이 드는 의자'],
+      ['임원의 가죽의자', '앉기만 해도 절로 어깨에 힘이 들어가는 가죽 의자'],
+      ['간이 침대 의자', '등받이가 완전히 펴져 사무실 숙박에 최적'],
+    ],
+    badge: [
+      ['땟물 사원증', '줄이 때 타고 때론 문도 잘 안 열리는 사원증'],
+      ['솜털 스트랩', '목에 닿는 느낌이 부드러워 안 찬 것 같아요'],
+      ['RGB 사원증', "멀리서 누가봐도 '나'"],
+      ['금빛 사원증', '케이스에 금을 넣었는지 너무 빤딱거린다'],
+      ['임원실 출입증', '임원실에 들어갈 수 있을것같이 생겼다'],
+      ['자정 통과증', '자정이 넘어도 경보음이 안 울리는 카드'],
+    ],
+    watch: [
+      ['수능 시계', '시계는 시간만 알면 되지'],
+      ['심박 측정기', '업무 스트레스로 뛰는 심장을 실시간 감시'],
+      ['게이머 워치', '업무 완료까지 남은 시간을 초 단위로 표시'],
+      ['성공의 시침', '금빛 찬란하여 퇴근 시간을 당겨줄 것 같은 시계.'],
+      ['금통 시계', '금통 시계... 나도 성공 했나..?'],
+      ['퇴근불능 시계', '왜 5시 59분에 멈춰있지..?'],
+    ],
+    ring: [
+      ['평범한 은반지', '평범한 은 반지이다'],
+      ['지압 반지', '손가락을 꾹꾹 눌러 혈액순환을 돕는 반지'],
+      ['무한 클릭 반지', '클릭 효율을 극대화해주는 게이머의 유산'],
+      ['반짝이는 금 반지', '금값이 얼마더라..?'],
+      ['권력의 결정체', '도장을 찍을 때 엄청난 위압감을 주는 왕반지'],
+      ['전기 충격 방지', "졸면 전기충격이 가해진다...'찌릿 ! '"],
+    ],
   };
-  // TYPES[slot] = [{ id: 'keyboard1', slot, name: '키보드1', subs }, ...]
+  // TYPES[slot] = [{ id: 'keyboard1', slot, theme: 0~5, name, desc, subs }, ...] (테마 순서)
   const TYPES = {};
   const TYPE_BY_ID = {};
   for (const slot of SLOT_KEYS) {
-    TYPES[slot] = TYPE_SUBS[slot].map((subs, i) => {
-      const t = { id: slot + (i + 1), slot, name: SLOTS[slot].name + (i + 1), subs };
+    TYPES[slot] = TYPE_TEXT[slot].map(([name, desc], i) => {
+      const t = { id: slot + (i + 1), slot, theme: i, name, desc, subs: THEMES[i].subs.slice() };
       TYPE_BY_ID[t.id] = t;
       return t;
     });
   }
 
-  // 서브 값 = 그 능력치가 주인 부위의 같은 등급·강화 주 값 × SUB_RATIO
-  const SUB_RATIO = 0.15;
-  // 주인 부위가 없는 능력치: 표[등급] × SUB_SPECIAL_GROWTH^강화 (일반→신화, %)
-  const SUB_SPECIAL = {
-    regen: [2, 3, 4, 6, 8, 10],
-    offline: [1, 2, 3, 4, 6, 8],
-    boss: [1, 2, 3, 4, 5, 6],
+  // 서브 '가치 예산' [⚖ 임시]: 서브 값(%) = MAIN_BASE[등급] × (1 + MAIN_PLUS_STEP × 강화) × SUB_K[능력치]
+  // → 모든 서브가 주 능력치처럼 등급·강화 따라 커짐 (예전 보스·체력 회복·방치는 등급이 올라도 거의 그대로였음)
+  // 딜 서브(공격·공속·치확·치뎀·쿨감·보스)는 그 부위 주 값의 약 10%, 재산·체력 서브는 25~30%, 회복·방치는 넉넉히
+  const SUB_K = {
+    atk: 0.10, // 신화 +20% (키보드 주 200%)
+    aspd: 0.03, // 신화 +6% (마우스 주 60%)
+    critRate: 0.01, // 신화 +2%p (모니터 주 20%p)
+    critDmg: 0.12, // 신화 +24%p (반지 주 200%p)
+    cdr: 0.015, // 신화 +3%p (시계 주 20%p)
+    boss: 0.04, // 신화 +8%
+    hp: 0.25, // 신화 +50% (의자 주 200%)
+    gold: 0.15, // 신화 +30% (사원증 주 100%)
+    regen: 0.10, // 신화 +20%
+    offline: 0.05, // 신화 +10% (장비 합계 상한 100%)
   };
-  const SUB_SPECIAL_GROWTH = 1.06;
+
+  // 세트 효과 [⚖ 임시]: 같은 테마를 4개·7개 장착하면 (7개면 4개 효과 + 7개 효과 둘 다). 값은 %(치확·쿨감은 %p)
+  // 테마마다 강한 상황이 다르게: 짠돌이 재산·방치 / 인체공학 버티기 / 게이밍 일반 층(빠른 처리) / 고오급 치명타 / 권력 보스전 / 야근 전문가 방치·스킬
+  const SET = {
+    counts: [4, 7],
+    effects: [
+      [{ gold: 15 }, { gold: 40, offline: 20 }],
+      [{ hp: 15, regen: 20 }, { hp: 40, regen: 50 }],
+      [{ aspd: 10 }, { aspd: 20, critRate: 5 }],
+      [{ critDmg: 30 }, { critDmg: 80, critRate: 3 }],
+      [{ boss: 20 }, { boss: 60 }],
+      [{ offline: 20, cdr: 2 }, { offline: 40, cdr: 5 }],
+    ],
+  };
+
+  // 장비 프리셋: 착용 1 + 교체용 1 (2026-11-05 결정)
+  const PRESETS = 2;
 
   // ----- 6. 잠재능력 -----
   // values[stat][등급]: null = 줄 없음, { flat: n } = n × 깡수치 기준값,
@@ -216,7 +299,9 @@
   // ----- 11. 도감 [임시] -----
   // 키 `${type}:${grade}` 처음 얻으면 등록 → 보상
   const CODEX = { stat: 'atk', pct: 0.5, bonus: 10 }; // 공격력 +0.5% (영구, 합산) + 성과급 10
-  const CODEX_SIZE = SLOT_KEYS.reduce((n, s) => n + TYPES[s].length, 0) * GRADES.length; // 126
+  const CODEX_SIZE = SLOT_KEYS.reduce((n, s) => n + TYPES[s].length, 0) * GRADES.length; // 252
+  // 테마 도감 [⚖ 임시]: 한 테마의 7부위를 (등급 상관없이) 다 등록하면 영구 능력치 — 모든 테마 같은 크기
+  const THEME_CODEX = { stat: 'atk', pct: 3 };
 
   // 장비 업적 조건 (eq = {부위: 아이템|null}) → {eq_full4, eq_badge, eq_epic7, eq_mythic} 중 이룬 것만 1. 폰 엔진·서버 진행 장부(progress.js)가 같이 씀
   function equipAch(eq) {
@@ -231,7 +316,7 @@
 
   G.Items = {
     GRADES, STATS, STAT_KEYS, CAPS, SLOTS, SLOT_KEYS, MAIN_BASE, MAIN_PLUS_STEP, equipAch,
-    TYPES, TYPE_BY_ID, SUB_RATIO, SUB_SPECIAL, SUB_SPECIAL_GROWTH,
+    THEMES, TYPES, TYPE_BY_ID, SUB_K, SET, PRESETS, THEME_CODEX,
     POTENTIAL, FLAT_BASE, FLAT_MIN, COST_BASE_KILLS, COST_K, APPRAISE, ENHANCE, MERGE, DISMANTLE,
     BAG_SIZE, BAG, MARKET, STAMP, DROP, CODEX, CODEX_SIZE,
   };

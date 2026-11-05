@@ -23,7 +23,9 @@
   const bagUsed = (st) => (typeof st.bagUsed === 'number' ? st.bagUsed : st.items.length);
   const bagFree = (st) => Math.max(0, bagSize(st) - bagUsed(st));
   const find = (st, id) => st.items.find((it) => it.id === id) || null;
-  const isEquipped = (st, id) => Object.values(st.equipped || {}).some((x) => x === id);
+  // 장착 중 = 지금 장착 + 교체용 프리셋 (합성·분해·판매에서 보호. 서버는 폰이 equipped에 둘 다 보냄)
+  const kept = (st) => [...Object.values(st.equipped || {}), ...Object.values(st.presetAlt || {})];
+  const isEquipped = (st, id) => kept(st).some((x) => x === id);
   function removeIds(st, ids) {
     const del = new Set(ids);
     const before = st.items.length;
@@ -314,7 +316,7 @@
     if (!Array.isArray(ids)) return no(`같은 부위·등급 아이템 ${I.MERGE.count}개가 필요해요`);
     const items = ids.map((id) => find(st, id));
     if (items.some((x) => !x)) return no('없는 아이템이에요');
-    const err = Eq.mergeError(items, st.equipped);
+    const err = Eq.mergeError(items, kept(st));
     if (err) return no(err);
     const grade = items[0].grade;
     const r = Eq.merge(items, h.rng, st.mergeFail[grade], st.nextItemId);

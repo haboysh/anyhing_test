@@ -289,6 +289,13 @@
     const itemName = (it) => Eq.itemName(it);
     const gradeTag = (g) => `<span class="gtag" style="color:${GR[g].color}">${GR[g].name}</span>`;
     const slotGlyph = (slot) => I.SLOTS[slot].name[0];
+    // 테마 도장 (인주색) · 세트 효과 글자 "재산 획득 +15%, 방치 보상 +20%"
+    const themeStamp = (th) => `<span class="th-stamp">${I.THEMES[th].name}</span>`;
+    const effText = (eff) => Object.entries(eff).map(([k, v]) => `${statName(k)} +${n2(v)}${I.STATS[k].unit}`).join(', ');
+    // 테마 한 줄: 4세트·7세트 효과, 켜진 건 형광펜
+    const setLines = (th, n) => I.SET.counts.map((need, i) =>
+      `<div class="set-line ${n >= need ? 'on' : ''}"><span>${need}세트</span><b>${effText(I.SET.effects[th][i])}</b></div>`).join('');
+    const altPresetHas = (id) => I.SLOT_KEYS.some((slot) => E.S.presetAlt[slot] === id);
     // 아이템 아이콘: 종류 그림(www/img/items/<type>.png) + 등급 색 배경
     function itemIcon(it, opt = {}) {
       const c = GR[it.grade].color;
@@ -297,7 +304,7 @@
         ${it.plus ? `<span class="pl">+${it.plus}</span>` : ''}
         ${!it.appraised ? '<span class="q">?</span>' : ''}
         ${it.protected ? `<span class="lk">${ICON.lock}</span>` : ''}
-        ${!opt.noEq && E.isEquipped(it.id) ? '<span class="eqb">E</span>' : ''}</div>`;
+        ${!opt.noEq && E.isEquipped(it.id) ? '<span class="eqb">E</span>' : !opt.noEq && altPresetHas(it.id) ? `<span class="eqb alt">P${2 - E.S.preset}</span>` : ''}</div>`;
     }
     // 결과 카드 (뽑기·정산·합성)
     function itemCard(it, badges = []) {
@@ -709,7 +716,9 @@
       const codexN = Object.keys(S.codex).filter((k) => S.codex[k]).length;
       const mk = E.marketStatus();
       return `
+        <div class="buy-mode eq-preset">${[0, 1].map((i) => `<button ${S.preset === i ? 'class="active"' : 'data-act="preset"'}>프리셋 ${i + 1}</button>`).join('')}</div>
         <div class="eq-slots">${slots}</div>
+        ${setChips()}
         <div class="eq-tools">
           <button data-act="box" id="btn-box">장신구 상자<small>조각 ${fmt(S.shards)}/${need}</small></button>
           <button data-act="market">양파나라<small>${S.market.list.length}/${I.MARKET.slots}${mk.list.some((r) => r.left <= 0) ? ' · 판매됨' : ''}</small></button>
@@ -738,7 +747,7 @@
 
     // 가방 선택 모드: 고를 수 있는 아이템인지
     function canPick(it) {
-      if (E.isEquipped(it.id) || it.protected) return false;
+      if (E.isKept(it.id) || it.protected) return false;
       if (bagMode === 'sell') return bagPick.has(it.id) || bagPick.size < E.marketSlotsFree();
       if (bagMode === 'merge') {
         if (it.ruined || it.grade >= GR.length - 1) return false;
@@ -774,7 +783,7 @@
       } else if (a === 'bm-auto') {
         // 고른 게 있으면 그 부위·등급, 없으면 묶음이 되는 가장 낮은 등급
         const first = bagPick.size ? E.item([...bagPick][0]) : null;
-        const ok = (x) => !E.isEquipped(x.id) && !x.protected && !x.ruined && x.grade < GR.length - 1;
+        const ok = (x) => !E.isKept(x.id) && !x.protected && !x.ruined && x.grade < GR.length - 1;
         let pool = [];
         if (first) pool = E.S.items.filter((x) => ok(x) && x.slot === first.slot && x.grade === first.grade);
         else {
@@ -818,7 +827,11 @@
         }
         return;
       } else if (a === 'bulk-merge') { showBulkMerge(); return; }
-      else if (a === 'rec-equip') {
+      else if (a === 'preset') {
+        if (bagMode !== 'view') return;
+        const r = E.presetSwap();
+        toast(`프리셋 ${r.preset + 1}로 바꿨어요${r.missing ? ` · 없어진 장비 ${r.missing}칸은 비웠어요` : ''}`);
+      } else if (a === 'rec-equip') {
         const r = E.recommendEquip();
         if (!r.ok) { toast(r.reason); return; }
         showModal('추천 장착', `<div class="small">부위마다 주 능력치가 가장 높은 장비로 바꿨어요</div><div class="g-grid">${r.changes.map((c) => itemCard(E.item(c.to))).join('')}</div>`);
@@ -898,7 +911,7 @@
       else if (a === 'bulk') { if (toolMode === 'merge') showBulkMerge(); else showBulk(); }
       else if (a === 'auto') {
         const first = toolPick.size ? E.item([...toolPick][0]) : null;
-        const ok = (x) => !E.isEquipped(x.id) && !x.protected && !x.ruined && x.grade < GR.length - 1;
+        const ok = (x) => !E.isKept(x.id) && !x.protected && !x.ruined && x.grade < GR.length - 1;
         let pool = [];
         if (first) pool = E.S.items.filter((x) => ok(x) && x.slot === first.slot && x.grade === first.grade);
         else {
@@ -1050,17 +1063,38 @@
       });
     });
 
+    // 장비 탭: 장착한 테마별 개수 (4개 이상이면 도장 찍힘). 누르면 세트 효과 전체
+    function setChips() {
+      const n = Eq.setCounts(E.equippedItems());
+      const list = n.map((c, th) => [c, th]).filter(([c]) => c > 0).sort((a, b) => b[0] - a[0]);
+      return `<button class="set-chips" data-act="sets">${list.length
+        ? list.map(([c, th]) => `<span class="set-chip ${c >= I.SET.counts[0] ? 'on' : ''}">${I.THEMES[th].name} <b>${c}</b>/${c >= I.SET.counts[0] ? 7 : I.SET.counts[0]}</span>`).join('')
+        : '<span class="set-chip">같은 테마 4개·7개를 끼면 세트 효과</span>'}<i>세트 효과</i></button>`;
+    }
+    function showSets() {
+      const n = Eq.setCounts(E.equippedItems());
+      showModal('세트 효과', `<div class="small">같은 테마를 4개 끼면 4세트, 7개 모두 끼면 4세트와 7세트 효과를 함께 받아요</div>
+        ${I.THEMES.map((th, ti) => `<div class="it-sec set-sec"><div class="it-sec-t">${themeStamp(ti)} ${th.tip} · 지금 ${n[ti]}/7</div>${setLines(ti, n[ti])}</div>`).join('')}`);
+      $('modal-ok').textContent = '닫기';
+    }
+
     // 도감 보기
     function showCodex() {
       const S = E.S;
       const n = Object.keys(S.codex).filter((k) => S.codex[k]).length;
-      const rows = I.SLOT_KEYS.flatMap((slot) => I.TYPES[slot]).map((t) => `
-        <div class="cx-row"><span class="cx-name">${t.name}</span>${GR.map((g, gi) => {
-          const on = S.codex[`${t.id}:${gi}`];
-          return `<span class="cx-cell ${on ? 'on' : ''}" style="--gc:${g.color}">${on ? '✓' : ''}</span>`;
-        }).join('')}</div>`).join('');
+      const done = Eq.themeCodex(S.codex);
+      const rows = I.THEMES.map((th, ti) => {
+        const types = I.SLOT_KEYS.map((slot) => I.TYPES[slot][ti]);
+        const got = types.filter((t) => GR.some((_, gi) => S.codex[`${t.id}:${gi}`])).length;
+        return `<div class="cx-theme ${done[ti] ? 'done' : ''}">${themeStamp(ti)}<span>${got}/7 종류</span>
+          <b>${done[ti] ? `완성 · ${statName(I.THEME_CODEX.stat)} +${I.THEME_CODEX.pct}%` : `7종 모으면 ${statName(I.THEME_CODEX.stat)} +${I.THEME_CODEX.pct}%`}</b></div>` +
+          types.map((t) => `<div class="cx-row"><span class="cx-name">${t.name}</span>${GR.map((g, gi) => {
+            const on = S.codex[`${t.id}:${gi}`];
+            return `<span class="cx-cell ${on ? 'on' : ''}" style="--gc:${g.color}">${on ? '✓' : ''}</span>`;
+          }).join('')}</div>`).join('');
+      }).join('');
       showModal(`도감 ${n}/${I.CODEX_SIZE}`, `
-        <div class="cx-info">처음 얻을 때마다 ${statName(I.CODEX.stat)} +${I.CODEX.pct}% (영구) · 성과급 +${I.CODEX.bonus}개<br>지금 도감 보너스: <b>${statName(I.CODEX.stat)} +${n2(n * I.CODEX.pct)}%</b></div>
+        <div class="cx-info">처음 얻을 때마다 ${statName(I.CODEX.stat)} +${I.CODEX.pct}% (영구) · 성과급 +${I.CODEX.bonus}개<br>한 테마 7종을 모두 모으면 ${statName(I.THEME_CODEX.stat)} +${I.THEME_CODEX.pct}% 더<br>지금 도감 보너스: <b>${statName(I.CODEX.stat)} +${n2(Eq.codexBonus(S.codex)[I.CODEX.stat].pct)}%</b></div>
         <div class="cx-head"><span class="cx-name"></span>${GR.map((g) => `<span style="color:${g.color}">${g.name}</span>`).join('')}</div>
         <div class="cx-list">${rows}</div>`);
     }
@@ -1068,7 +1102,7 @@
     // 일괄 분해: 등급 고르기
     function showBulk() {
       const K = E.costBase();
-      const can = (it) => !E.isEquipped(it.id) && !it.protected;
+      const can = (it) => !E.isKept(it.id) && !it.protected;
       const btns = GR.map((g, gi) => {
         const list = E.S.items.filter((it) => it.grade <= gi && can(it));
         const gold = list.reduce((s, it) => s + Eq.dismantleValue(it, K), 0);
@@ -1144,9 +1178,9 @@
         const rate = Eq.mergeRate(S.mergeFail[it.grade]);
         let err = null;
         if (it.grade >= GR.length - 1) err = `${GR[GR.length - 1].name} 등급은 합성할 수 없어요`;
-        else if (equipped) err = '장착 중인 아이템은 먼저 해제해 주세요';
+        else if (E.isKept(it.id)) err = equipped ? '장착 중인 아이템은 먼저 해제해 주세요' : '교체용 프리셋에 낀 장비는 재료로 쓸 수 없어요';
         else if (it.protected) err = '보호 중인 아이템은 재료로 쓸 수 없어요';
-        const cands = E.S.items.filter((x) => x.id !== it.id && x.slot === it.slot && x.grade === it.grade && !E.isEquipped(x.id) && !x.protected);
+        const cands = E.S.items.filter((x) => x.id !== it.id && x.slot === it.slot && x.grade === it.grade && !E.isKept(x.id) && !x.protected);
         mergeHtml = `<div class="merge-box">
           <div class="it-sec-t">합성 재료 ${mergePick.size}/${needMore} · 성공률 <b>${Math.round(rate * 100)}%</b>${S.mergeFail[it.grade] ? ` (연속 실패 ${S.mergeFail[it.grade]})` : ''}<button class="rate-link" data-rates="merge">확률</button></div>
           ${err ? `<div class="warn-line">${err}</div>` : cands.length < needMore
@@ -1158,7 +1192,7 @@
         </div>`;
       }
 
-      const canDis = !equipped && !it.protected;
+      const canDis = !E.isKept(it.id) && !it.protected;
       $('sheet-box').innerHTML = `
         <button class="sheet-x" data-act="close">✕</button>
         <div class="it-head" style="--gc:${g.color}">
@@ -1166,9 +1200,10 @@
           <div class="it-title">
             <div class="it-name">${itemName(it)}${it.plus ? ` <span class="plus">+${it.plus}</span>` : ''}</div>
             <div class="it-meta">${gradeTag(it.grade)} · ${slot.name}(${slot.body}) · ${it.floor}층</div>
-            <div class="it-badges">${equipped ? '<i class="on">장착 중</i>' : ''}${it.protected ? `<i>${ICON.lock} 보호</i>` : ''}</div>
+            <div class="it-badges">${equipped ? '<i class="on">장착 중</i>' : altPresetHas(it.id) ? `<i>프리셋 ${2 - S.preset} 장착</i>` : ''}${it.protected ? `<i>${ICON.lock} 보호</i>` : ''}</div>
           </div>
         </div>
+        ${I.TYPE_BY_ID[it.type].desc ? `<div class="it-desc">${I.TYPE_BY_ID[it.type].desc}</div>` : ''}
         <div class="it-sec">
           <div class="it-sec-t">주 능력치</div>
           <div class="it-line main"><span>${statName(main)}</span><b>${statText(main, Eq.mainValue(it), 'pct')}</b></div>
@@ -1177,6 +1212,8 @@
           <div class="it-sec-t">서브 능력치</div>
           ${Eq.subValues(it).map((s) => `<div class="it-line"><span>${statName(s.stat)}</span><b>${statText(s.stat, s.value, 'pct')}</b></div>`).join('')}
         </div>
+        ${(() => { const th = Eq.themeOf(it); const n = Eq.setCounts(E.equippedItems())[th];
+          return `<div class="it-sec set-sec"><div class="it-sec-t">${themeStamp(th)} 세트 · 지금 ${n}/7 장착</div>${setLines(th, n)}</div>`; })()}
         <div class="it-sec">
           <div class="it-sec-t">잠재능력</div>
           ${pot}
@@ -2075,7 +2112,7 @@
     function onPanelAct(a) {
       const S = E.S;
       const res = (r, msg) => { if (!r.ok) toast(r.reason); else if (msg) toast(msg); renderPanel(); return r; };
-      if (a.startsWith('bm-') || a.startsWith('mk-') || ['bulk-merge', 'rec-equip', 'bulk-enh', 'market'].includes(a)) { bagAct(a); return; }
+      if (a.startsWith('bm-') || a.startsWith('mk-') || ['bulk-merge', 'preset', 'rec-equip', 'bulk-enh', 'market'].includes(a)) { bagAct(a); return; }
       if (a === 'box') {
         Y.openShardBox().then((r) => {
           if (!r.ok) { toast(r.reason); return; }
@@ -2084,6 +2121,7 @@
           renderPanel();
         });
       } else if (a === 'codex') showCodex();
+      else if (a === 'sets') showSets();
       else if (a === 'bulk') showBulk();
       else if (a === 'auto') {
         const on = !S.autoAppraise;

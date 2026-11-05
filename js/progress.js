@@ -639,6 +639,8 @@
       burnLeft -= n;
       rej('burn', n0 - n);
       stat('burnout', n);
+      // 폰은 번아웃하면 그 층 처치 수를 0으로 되돌림 (후퇴 안 해도) → 서버도 맨 위 층 진행을 0으로 (서버가 폰보다 한 층 앞서가지 않게)
+      if (n > 0) P.run.prog = 0;
       const pb = P.run.pb;
       if (P.pres > 0 && !pb.f && P.run.top < P.run.start + CFG.probation.floors) {
         pb.n = Math.min(99, pb.n + n);

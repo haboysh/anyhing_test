@@ -1083,6 +1083,25 @@
       return ok({ item, prev: prev === null || prev === undefined ? null : prev });
     };
 
+    // 장비 프리셋 바꾸기: 지금 장착 ↔ 교체용 (없어진 장비·흔적 칸은 비움)
+    E.isKept = (id) => E.isEquipped(id) || I.SLOT_KEYS.some((slot) => E.S.presetAlt[slot] === id);
+    E.presetSwap = function () {
+      const next = {};
+      let missing = 0;
+      for (const slot of I.SLOT_KEYS) {
+        const id = E.S.presetAlt[slot];
+        const it = id === null || id === undefined ? null : E.item(id);
+        if (id !== null && id !== undefined && (!it || it.ruined || it.slot !== slot)) missing++;
+        next[slot] = it && !it.ruined && it.slot === slot ? it.id : null;
+      }
+      E.S.presetAlt = { ...E.S.equipped };
+      E.S.equipped = next;
+      E.S.preset = E.S.preset === 1 ? 0 : 1;
+      gearChanged();
+      emit('save');
+      return ok({ preset: E.S.preset, missing });
+    };
+
     E.unequip = function (slot) {
       if (!(slot in I.SLOTS)) return no('없는 부위예요');
       const id = E.S.equipped[slot];
@@ -1287,6 +1306,8 @@
       }
       if (p.board && p.board.seenId > S.board.seenId) S.board = { ...p.board };
       if (p.equipped) for (const slot of I.SLOT_KEYS) S.equipped[slot] = Number.isInteger(p.equipped[slot]) ? p.equipped[slot] : null;
+      if (p.presetAlt) for (const slot of I.SLOT_KEYS) S.presetAlt[slot] = Number.isInteger(p.presetAlt[slot]) ? p.presetAlt[slot] : null;
+      if (p.preset !== undefined) S.preset = p.preset;
       if (p.skills && Array.isArray(p.skills.slots)) S.skills.slots = SK.clean({ ...S.skills, slots: p.skills.slots }, S.maxStage).slots; // 가진 스킬·열린 칸만
       if (p.pet && p.pet.out !== undefined) S.pet.out = typeof p.pet.out === 'string' && G.Pets.owned(S.pet, p.pet.out) ? p.pet.out : S.pet.out;
       cleanEquipped();
@@ -1332,6 +1353,8 @@
       for (const slot of I.SLOT_KEYS) {
         const it = E.item(E.S.equipped[slot]);
         if (!it || it.ruined || it.slot !== slot) E.S.equipped[slot] = null;
+        const a = E.item(E.S.presetAlt[slot]);
+        if (!a || a.slot !== slot) E.S.presetAlt[slot] = null;
       }
     }
     // 서버 응답의 아이템 사본 → 기기 아이템 객체 (화면이 들고 있는 참조가 그대로 이어지게)

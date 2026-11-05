@@ -10,10 +10,6 @@
   const toInt = (v, d = 0) => (typeof v === 'number' && isFinite(v) ? Math.floor(v) : d);
   const isGrade = (g) => Number.isInteger(g) && g >= 0 && g < GRADES.length;
 
-  // 능력치 → 그 능력치가 주 능력치인 부위
-  const MAIN_SLOT_OF = {};
-  for (const slot of I.SLOT_KEYS) MAIN_SLOT_OF[SLOTS[slot].main] = slot;
-
   // ----- 생성 -----
   // slot은 생략 가능(type에서 찾음). plus는 합성 결과용(기본 0)
   function createItem({ id, slot, type, grade, floor, plus = 0 }) {
@@ -45,15 +41,29 @@
   // 주 능력치 값 (%)
   const mainValue = (item) => clean(mainAt(item.slot, item.grade, item.plus));
 
-  // 서브 2개 [{ stat, value }]. 주인 부위가 있으면 그 부위 주 값 × SUB_RATIO, 없으면 특수표 × 성장^강화
+  // 서브 2개 [{ stat, value }] = MAIN_BASE[등급] × (1 + 강화 성장) × SUB_K[능력치] (가치 예산, items.js)
   function subValues(item) {
-    return TYPE_BY_ID[item.type].subs.map((stat) => {
-      const owner = MAIN_SLOT_OF[stat];
-      const value = owner
-        ? mainAt(owner, item.grade, item.plus) * I.SUB_RATIO
-        : I.SUB_SPECIAL[stat][item.grade] * Math.pow(I.SUB_SPECIAL_GROWTH, item.plus);
-      return { stat, value: clean(value) };
-    });
+    const scale = I.MAIN_BASE[item.grade] * (1 + I.MAIN_PLUS_STEP * item.plus);
+    return TYPE_BY_ID[item.type].subs.map((stat) => ({ stat, value: clean(scale * I.SUB_K[stat]) }));
+  }
+  const themeOf = (item) => (item && TYPE_BY_ID[item.type] ? TYPE_BY_ID[item.type].theme : -1);
+
+  // ----- 세트 효과 -----
+  // 장착 아이템 → 테마별 개수 [6] (흔적은 안 셈)
+  function setCounts(equippedItems) {
+    const list = Array.isArray(equippedItems) ? equippedItems : Object.values(equippedItems || {});
+    const n = I.THEMES.map(() => 0);
+    for (const it of list) if (it && !it.ruined && TYPE_BY_ID[it.type]) n[themeOf(it)]++;
+    return n;
+  }
+  // 켜진 세트 효과 합 {stat: %} (4개·7개 효과는 겹쳐 받음)
+  function setBonus(counts) {
+    const out = {};
+    counts.forEach((n, th) => I.SET.counts.forEach((need, i) => {
+      if (n < need) return;
+      for (const [k, v] of Object.entries(I.SET.effects[th][i])) out[k] = clean((out[k] || 0) + v);
+    }));
+    return out;
   }
 
   // ----- 잠재능력 -----
@@ -229,10 +239,11 @@
   }
 
   // 장착 아이템(배열 또는 {slot: item}) + extra(도감 등: {stat: % 숫자 | {pct, flat}}) 합산.
-  // → { raw: 상한 전, capped: 상한 후, bySource: {main, sub, potential, extra} }, 각 {stat: {pct, flat}}
+  // 같은 테마 4·7개면 세트 효과도 더함.
+  // → { raw: 상한 전, capped: 상한 후, bySource: {main, sub, potential, set, extra} }, 각 {stat: {pct, flat}}
   function computeBonuses(equippedItems, extra) {
     const list = Array.isArray(equippedItems) ? equippedItems : Object.values(equippedItems || {});
-    const src = { main: emptyTotals(), sub: emptyTotals(), potential: emptyTotals(), extra: emptyTotals() };
+    const src = { main: emptyTotals(), sub: emptyTotals(), potential: emptyTotals(), set: emptyTotals(), extra: emptyTotals() };
     for (const item of list) {
       if (!item || !TYPE_BY_ID[item.type] || item.ruined) continue;
       src.main[mainStat(item)].pct += mainValue(item);
@@ -243,6 +254,7 @@
         }
       }
     }
+    for (const [k, v] of Object.entries(setBonus(setCounts(list)))) src.set[k].pct += v;
     for (const k of Object.keys(extra || {})) {
       if (!src.extra[k]) continue;
       const v = extra[k];
@@ -265,10 +277,22 @@
 
   // ----- 도감 -----
   const codexKey = (item) => `${item.type}:${item.grade}`;
-  // 도감({key: true}) → computeBonuses의 extra 형태
+  // 다 모은 테마 [true/false × 6]: 한 테마의 7부위를 등급 상관없이 하나씩이라도 등록
+  function themeCodex(codex) {
+    const got = new Set();
+    for (const k of Object.keys(codex || {})) if (codex[k]) got.add(k.split(':')[0]);
+    return I.THEMES.map((_, th) => I.SLOT_KEYS.every((slot) => got.has(I.TYPES[slot][th].id)));
+  }
+  // 도감({key: true}) → computeBonuses의 extra 형태 (칸마다 + 다 모은 테마마다)
   function codexBonus(codex) {
     const n = Object.keys(codex || {}).filter((k) => codex[k]).length;
-    return { [I.CODEX.stat]: { pct: clean(n * I.CODEX.pct), flat: 0 } };
+    const out = { [I.CODEX.stat]: { pct: clean(n * I.CODEX.pct), flat: 0 } };
+    const th = themeCodex(codex).filter(Boolean).length;
+    if (th) {
+      const k = I.THEME_CODEX.stat;
+      out[k] = { pct: clean(((out[k] && out[k].pct) || 0) + th * I.THEME_CODEX.pct), flat: (out[k] && out[k].flat) || 0 };
+    }
+    return out;
   }
 
   // ----- 세이브·서버 입력 검증 -----
@@ -311,5 +335,6 @@
     createItem, itemName, mainStat, mainValue, subValues, flatBase, rollPotentials,
     appraiseCost, reappraiseCost, maxLocks, enhanceRate, enhanceCost, enhanceCostMult, enhanceOdds, rollEnhance, restoreCost,
     mergeRate, mergeError, merge, dismantleValue, computeBonuses, codexKey, codexBonus,
+    themeOf, setCounts, setBonus, themeCodex,
   };
 })(globalThis.Game = globalThis.Game || {});

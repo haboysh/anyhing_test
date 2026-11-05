@@ -22,6 +22,7 @@
       // v2: 장비·장신구·뽑기 (이직해도 유지)
       items: [], nextItemId: 1,
       equipped: Object.fromEntries(I.SLOT_KEYS.map((k) => [k, null])),
+      preset: 0, presetAlt: Object.fromEntries(I.SLOT_KEYS.map((k) => [k, null])), // 장비 프리셋: 지금 번호(0·1) + 교체용 장착
       bonus: 0, corp: 0, jjam: 0, shards: 0, // 성과급, 법카, 짬, 장신구 조각
       codex: {},
       gacha: { acc: gachaFresh(), equip: gachaFresh(), skill: gachaFresh(), pet: gachaFresh() },
@@ -131,6 +132,13 @@
       const it = byId.get(eq[slot]);
       s.equipped[slot] = it && it.slot === slot ? it.id : null;
     }
+    const alt = raw.presetAlt && typeof raw.presetAlt === 'object' ? raw.presetAlt : {};
+    s.presetAlt = {};
+    for (const slot of I.SLOT_KEYS) {
+      const it = byId.get(alt[slot]);
+      s.presetAlt[slot] = it && it.slot === slot ? it.id : null;
+    }
+    s.preset = raw.preset === 1 ? 1 : 0;
     // 도감: 올바른 키만 true로
     const codex = raw.codex && typeof raw.codex === 'object' ? raw.codex : {};
     s.codex = {};
@@ -236,6 +244,9 @@
     if (bo) out.board = { seenId: Number.isInteger(bo.seenId) && bo.seenId >= 0 ? bo.seenId : 0, seenRates: typeof bo.seenRates === 'string' ? bo.seenRates.slice(0, 32) : '' };
     const eq = obj(r.equipped);
     if (eq) { out.equipped = {}; for (const slot of I.SLOT_KEYS) out.equipped[slot] = Number.isInteger(eq[slot]) && eq[slot] > 0 ? eq[slot] : null; }
+    const pa = obj(r.presetAlt);
+    if (pa) { out.presetAlt = {}; for (const slot of I.SLOT_KEYS) out.presetAlt[slot] = Number.isInteger(pa[slot]) && pa[slot] > 0 ? pa[slot] : null; }
+    if (r.preset === 0 || r.preset === 1) out.preset = r.preset;
     const sk = obj(r.skills);
     if (sk && Array.isArray(sk.slots)) out.skills = { slots: sk.slots.slice(0, 8).map((k) => (typeof k === 'string' && G.Skills.BY_KEY[k] ? k : null)) };
     const pe = obj(r.pet);
