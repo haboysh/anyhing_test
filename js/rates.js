@@ -53,7 +53,7 @@
       const sl = slotNames(meta.slotKind);
       const types = I.TYPES[G.Drops.SLOTS_OF[meta.slotKind][0]].length;
       notes.push(`등급이 정해지면 부위(${sl.join('·')})는 각 1/${sl.length}, 종류는 부위마다 ${types}종 중 각 1/${types}로 똑같아요`);
-      notes.push(`뽑기 레벨마다 업무력 +${c.LEVEL_ATK.slice(1).join('/')}% (Lv.1~${c.LEVELS.length}, 장비·장신구 따로)`);
+      notes.push(`뽑기 레벨마다 업무력 +${c.LEVEL_ATK.slice(1).join('/')}% (Lv.1~${c.LEVELS.length}, 뽑기 종류마다 따로, 서로 곱함)`);
     }
     if (kind === 'skill') {
       const SK = G.Skills;

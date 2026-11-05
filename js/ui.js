@@ -20,6 +20,7 @@
       { id: 'corp_1000', corp: 1000, krw: 1100 },
       { id: 'corp_5000', corp: 5000, krw: 5500 },
       { id: 'corp_10000', corp: 10000, krw: 11000 },
+      { id: 'monthly_30', corp: 500, krw: 5500, monthly: true, hidden: true }, // 월정액 (monthlyBox에서 팖)
     ],
     dev: { bonus: 10000, corp: 10000, goldK: 200, jjam: 100 }, // 개발용 지급 (재산 = K × goldK)
     bagFullToastSec: 8, // 가방 가득 알림 최소 간격
@@ -291,10 +292,14 @@
     const slotGlyph = (slot) => I.SLOTS[slot].name[0];
     // 테마 도장 (인주색) · 세트 효과 글자 "재산 획득 +15%, 방치 보상 +20%"
     const themeStamp = (th) => `<span class="th-stamp">${I.THEMES[th].name}</span>`;
-    const effText = (eff) => Object.entries(eff).map(([k, v]) => `${statName(k)} +${n2(v)}${I.STATS[k].unit}`).join(', ');
-    // 테마 한 줄: 4세트·7세트 효과, 켜진 건 형광펜
-    const setLines = (th, n) => I.SET.counts.map((need, i) =>
-      `<div class="set-line ${n >= need ? 'on' : ''}"><span>${need}세트</span><b>${effText(I.SET.effects[th][i])}</b></div>`).join('');
+    const effText = (eff, m = 1) => Object.entries(eff).map(([k, v]) => `${statName(k)} +${n2(v * m)}${I.STATS[k].unit}`).join(', ');
+    // 테마 한 줄: 4세트·7세트 효과. 켜진 건 형광펜 + 지금 등급 배율 적용 값, 안 켜진 건 일반 등급 기준 값
+    const GM = I.SET.gradeMult;
+    const setLines = (th) => {
+      const ms = Eq.setMults(E.equippedItems(), th);
+      return I.SET.counts.map((need, i) => `<div class="set-line ${ms[i] ? 'on' : ''}"><span>${need}세트</span><b>${effText(I.SET.effects[th][i], ms[i] || 1)}${ms[i] ? ` <small>(×${ms[i]})</small>` : ''}</b></div>`).join('') +
+        `<div class="set-note">세트 장비 등급이 높을수록 커져요 · 일반 ×${GM[0]} ~ 신화 ×${GM[GM.length - 1]} (세트 중 가장 낮은 등급 기준)</div>`;
+    };
     const altPresetHas = (id) => I.SLOT_KEYS.some((slot) => E.S.presetAlt[slot] === id);
     // 아이템 아이콘: 종류 그림(www/img/items/<type>.png) + 등급 색 배경
     function itemIcon(it, opt = {}) {
@@ -806,8 +811,8 @@
         }
         if (bagMode === 'merge') {
           const g = E.item(ids[0]).grade;
-          askConfirm('합성할까요?', `성공률 <b class="gold">${Math.round(Eq.mergeRate(E.S.mergeFail[g]) * 100)}%</b><br>실패하면 재료 ${I.MERGE.count}개가 사라지고 짬 +${I.MERGE.failJjam}개`, '합성하기', () => {
-            Y.merge(ids).then((r) => {
+          askConfirm('합성할까요?', `성공률 <b class="gold">${Math.round(Eq.mergeRate(E.S.mergeFail[g]) * 100)}%</b><br>성공하면 <b>${itemName(E.item(ids[0]))}</b>(처음 고른 장비 종류)로 나와요<br>실패하면 재료 ${I.MERGE.count}개가 사라지고 짬 +${I.MERGE.failJjam}개`, '합성하기', () => {
+            Y.merge(ids, E.item(ids[0]).type).then((r) => {
               bagPick = new Set();
               if (!r.ok) toast(r.reason);
               else if (r.success) { showModal('합성 성공!', `<div class="g-grid one">${itemCard(r.item)}</div>`); recentNew.clear(); }
@@ -931,8 +936,8 @@
         const ids = [...toolPick];
         if (toolMode === 'merge') {
           const g = E.item(ids[0]).grade;
-          askConfirm('합성할까요?', `성공률 <b class="gold">${Math.round(Eq.mergeRate(E.S.mergeFail[g]) * 100)}%</b><br>실패하면 재료 ${I.MERGE.count}개가 사라지고 짬 +${I.MERGE.failJjam}개`, '합성하기', () => {
-            Y.merge(ids).then((r) => {
+          askConfirm('합성할까요?', `성공률 <b class="gold">${Math.round(Eq.mergeRate(E.S.mergeFail[g]) * 100)}%</b><br>성공하면 <b>${itemName(E.item(ids[0]))}</b>(처음 고른 장비 종류)로 나와요<br>실패하면 재료 ${I.MERGE.count}개가 사라지고 짬 +${I.MERGE.failJjam}개`, '합성하기', () => {
+            Y.merge(ids, E.item(ids[0]).type).then((r) => {
               toolPick = new Set();
               if (!r.ok) toast(r.reason);
               else if (r.success) { showModal('합성 성공!', `<div class="g-grid one">${itemCard(r.item)}</div>`); recentNew.clear(); }
@@ -1074,7 +1079,7 @@
     function showSets() {
       const n = Eq.setCounts(E.equippedItems());
       showModal('세트 효과', `<div class="small">같은 테마를 4개 끼면 4세트, 7개 모두 끼면 4세트와 7세트 효과를 함께 받아요</div>
-        ${I.THEMES.map((th, ti) => `<div class="it-sec set-sec"><div class="it-sec-t">${themeStamp(ti)} ${th.tip} · 지금 ${n[ti]}/7</div>${setLines(ti, n[ti])}</div>`).join('')}`);
+        ${I.THEMES.map((th, ti) => `<div class="it-sec set-sec"><div class="it-sec-t">${themeStamp(ti)} ${th.tip} · 지금 ${n[ti]}/7</div>${setLines(ti)}</div>`).join('')}`);
       $('modal-ok').textContent = '닫기';
     }
 
@@ -1213,7 +1218,7 @@
           ${Eq.subValues(it).map((s) => `<div class="it-line"><span>${statName(s.stat)}</span><b>${statText(s.stat, s.value, 'pct')}</b></div>`).join('')}
         </div>
         ${(() => { const th = Eq.themeOf(it); const n = Eq.setCounts(E.equippedItems())[th];
-          return `<div class="it-sec set-sec"><div class="it-sec-t">${themeStamp(th)} 세트 · 지금 ${n}/7 장착</div>${setLines(th, n)}</div>`; })()}
+          return `<div class="it-sec set-sec"><div class="it-sec-t">${themeStamp(th)} 세트 · 지금 ${n}/7 장착</div>${setLines(th)}</div>`; })()}
         <div class="it-sec">
           <div class="it-sec-t">잠재능력</div>
           ${pot}
@@ -1348,8 +1353,8 @@
       } else if (a === 'merge-go') {
         const ids = [it.id, ...mergePick];
         const rate = Eq.mergeRate(E.S.mergeFail[it.grade]);
-        askConfirm('합성할까요?', `성공률 <b class="gold">${Math.round(rate * 100)}%</b><br>실패하면 재료 ${I.MERGE.count}개가 모두 사라지고 짬 +${I.MERGE.failJjam}개`, '합성하기', () => {
-          Y.merge(ids).then((r) => {
+        askConfirm('합성할까요?', `성공률 <b class="gold">${Math.round(rate * 100)}%</b><br>성공하면 <b>${itemName(it)}</b> 그대로 한 등급 위로 나와요<br>실패하면 재료 ${I.MERGE.count}개가 모두 사라지고 짬 +${I.MERGE.failJjam}개`, '합성하기', () => {
+          Y.merge(ids, it.type).then((r) => {
             if (!r.ok) { toast(r.reason); renderSheet(); return; }
             if (r.success) {
               showModal('합성 성공!', `<div class="g-grid one">${itemCard(r.item)}</div>`);
@@ -1406,6 +1411,7 @@
           <button class="buy" data-act="ad" ${E.adsLeft() > 0 ? '' : 'disabled'}><span>광고 보기</span>${E.adsLeft() > 0 ? '받기' : '내일'}</button>
         </div>
         ${subBox()}
+        ${monthlyBox()}
         ${corpShop()}
         <div class="act-row">
           <button class="act-btn" data-act="corp-test">테스트 충전 +${fmt(UI_CFG.testCorp)}장</button>
@@ -1563,7 +1569,7 @@
       const day = Number(t.dataset.at);
       const st = E.attendance();
       const p = st.today === day ? Y.claimAttendance() : Y.fillAttendance(day);
-      p.then((r) => { toast(r.ok ? `출석 ${day}일 · 성과급 +${r.bonus}개${r.item ? ` · ${GR[r.item.grade].name} ${itemName(r.item)}` : ''}` : r.reason); showAttendance(); renderHud(); });
+      p.then((r) => { toast(r.ok ? `출석 ${day}일 · 성과급 +${r.bonus}개${r.pass ? ` · 패스·월정액 +${fmt(r.pass)}개` : ''}${r.item ? ` · ${GR[r.item.grade].name} ${itemName(r.item)}` : ''}` : r.reason); showAttendance(); renderHud(); });
     });
 
     // 미션·업적 한 줄: 체크 칸 · 이름 · 진행 막대 · 보상 (받을 수 있으면 형광펜)
@@ -1996,8 +2002,22 @@
       return `<div class="sub-box">
           <div class="sub-title">법카 구매</div>
           <div class="sub-desc">보유 법카 <b>${fmt(E.S.corp)}장</b> · 가방 확장, 출석 채우기, 성과급 교환에 써요</div>
-          ${UI_CFG.corpProducts.map((p) => `<div class="row"><div class="info"><div class="name">법카 ${fmt(p.corp)}장</div></div>
+          ${UI_CFG.corpProducts.filter((p) => !p.hidden).map((p) => `<div class="row"><div class="info"><div class="name">법카 ${fmt(p.corp)}장</div></div>
             <button class="buy" data-corp="${p.id}">₩${p.krw.toLocaleString('ko-KR')}</button></div>`).join('')}
+          <div class="small">지금은 테스트 결제라 실제 돈이 나가지 않아요.</div>
+        </div>`;
+    }
+
+    // 월정액: 즉시 법카 + 30일 동안 매일 출석 때 성과급 (서버가 기간 확인)
+    function monthlyBox() {
+      const PS = G.Meta.PASS;
+      const until = G.Subscription && G.Subscription.monthlyUntil ? G.Subscription.monthlyUntil() : null;
+      const left = until ? Math.ceil((until - Date.now()) / 86400000) : 0;
+      return `<div class="sub-box">
+          <div class="sub-title">월급날 월정액 ${until ? `· ${left}일 남음` : ''}</div>
+          <div class="sub-desc">바로 법카 ${fmt(PS.monthlyCorp)}장 + ${PS.monthlyDays}일 동안 매일 출석 때 성과급 +${fmt(PS.monthlyDaily)}개 (모두 ${fmt(PS.monthlyCorp + PS.monthlyDaily * PS.monthlyDays)}개어치)</div>
+          <div class="row"><div class="info"><div class="name">월정액 ${PS.monthlyDays}일</div><div class="small">이어서 사면 남은 기간에 더해져요</div></div>
+            <button class="buy" data-corp="monthly_30">₩${PS.monthlyKrw.toLocaleString('ko-KR')}</button></div>
           <div class="small">지금은 테스트 결제라 실제 돈이 나가지 않아요.</div>
         </div>`;
     }
@@ -2007,7 +2027,7 @@
       return `
         <div class="sub-box">
           <div class="sub-title">야근 패스 ${on ? '· 이용 중' : ''}</div>
-          <div class="sub-desc">구독 혜택: 게임 속도 2배</div>
+          <div class="sub-desc">₩5,500 / 30일 · 게임 속도 2배 · 방치 보상 +4시간 · 부서 적재 +4시간 · 매일 출석 때 성과급 +${fmt(G.Meta.PASS.subDaily)}개</div>
           <button class="sub-btn ${on ? 'off' : ''}" id="btn-sub-test">${on ? '테스트 구독 끄기' : '테스트로 구독 켜기'}</button>
           <div class="small">결제는 아직 없어요. 출시 때 앱스토어·플레이스토어 결제로 바뀌어요.</div>
         </div>`;
@@ -2093,9 +2113,9 @@
       } else if (t.dataset.corp) {
         const p = UI_CFG.corpProducts.find((x) => x.id === t.dataset.corp);
         if (!p || busy) return;
-        askConfirm('법카를 살까요?', `법카 <b class="gold">${fmt(p.corp)}</b> · ₩${p.krw.toLocaleString('ko-KR')}<br><span class="small">테스트 결제 (실제 결제 없음)</span>`, '구매', () => {
+        askConfirm(p.monthly ? '월정액을 살까요?' : '법카를 살까요?', `${p.monthly ? `법카 <b class="gold">${fmt(p.corp)}</b> + ${G.Meta.PASS.monthlyDays}일 매일 성과급 ${fmt(G.Meta.PASS.monthlyDaily)}` : `법카 <b class="gold">${fmt(p.corp)}</b>`} · ₩${p.krw.toLocaleString('ko-KR')}<br><span class="small">테스트 결제 (실제 결제 없음)</span>`, '구매', () => {
           busy = true;
-          Y.testCorp(p.corp, p.id).then((r) => { busy = false; toast(r.ok ? `법카 +${fmt(p.corp)}장` : r.reason); renderPanel(); renderHud(); });
+          Y.testCorp(p.corp, p.id).then((r) => { busy = false; toast(r.ok ? (p.monthly ? `월정액 시작 · 법카 +${fmt(p.corp)}장` : `법카 +${fmt(p.corp)}장`) : r.reason); renderPanel(); renderHud(); });
         });
       } else if (t.dataset.act) onPanelAct(t.dataset.act);
       else if (t.id === 'btn-quit') showApply(); else if (t.id === 'btn-sub-test') {

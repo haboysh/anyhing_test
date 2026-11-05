@@ -458,6 +458,8 @@ b.subst { color: var(--gold2); }
 .set-line { display: flex; gap: 10px; font-size: 12px; font-weight: 700; padding: 4px 6px; color: var(--sub); border-radius: 4px; }
 .set-line span { flex: none; width: 36px; font-weight: 900; }
 .set-line b { font-weight: 800; }
+.set-line small { font-size: 10px; font-weight: 700; opacity: .7; }
+.set-note { font-size: 10px; color: var(--sub); font-weight: 600; margin: 4px 6px 0; }
 /* 켜진 세트: 형광펜 긋기 */
 .set-line.on { color: var(--ink); background: linear-gradient(transparent 18%, var(--hilite) 18%, var(--hilite) 88%, transparent 88%); }
 .set-chips { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; width: 100%; min-height: 44px; padding: 6px 8px; margin: -2px 0 8px; border-radius: 12px; background: var(--card); border: 1px dashed var(--card-line); text-align: left; }

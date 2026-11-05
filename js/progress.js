@@ -36,6 +36,7 @@
     burnRest: F.REST_MIN, // 번아웃 보고 상한: 서버 시간 ÷ 최소 휴식(초) + 1
     maxGold: 1e300,
     skillBucketSec: 180, // 아아·야근 사용 보고 통 = 1번 + 3분 치 (쿨타임마다 1번)
+    skillSlack: 0.05, // 통이 이만큼 모자라도 1번 인정 (폰이 쿨타임 끝나자마자 쓰면 서버 시계로 몇백 ms 빠름 — 봇 seed 3)
     // 처치 수 통 (7단계 보안 점검 S2): 적은 한 번에 한 마리, 처치 뒤 다음 적까지 SPAWN_DELAY(0.05초) → 사람이 아무리 빨라도 게임 1초에 20마리.
     //   데미지 예산만 보면 아주 센 계정은 낮은 층에서 초당 수백만 마리를 우길 수 있었음(재산 5~16배·처치 업적·미션 바로). 칼퇴 선언 몫(x)은 따로
     killRate: 1 / F.SPAWN_DELAY, // 게임 1초에 최대 처치 수
@@ -622,7 +623,7 @@
           if (want > givenS[j]) { SU[j] = Math.min(Math.max(SU[j], suCap(cd)), SU[j] + want - givenS[j]); givenS[j] = want; }
         }
       }
-      const n = Math.max(0, Math.min(n0, Math.floor(SU[k] + 1e-9)));
+      const n = Math.max(0, Math.min(n0, Math.floor(SU[k] + CFG.skillSlack)));
       if (SU[k] >= 0) SU[k] = Math.max(0, SU[k] - n);
       out.skillRej += n0 - n;
       stat('skill_' + k, n);

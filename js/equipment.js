@@ -49,21 +49,32 @@
   const themeOf = (item) => (item && TYPE_BY_ID[item.type] ? TYPE_BY_ID[item.type].theme : -1);
 
   // ----- 세트 효과 -----
+  const listOf = (eq) => (Array.isArray(eq) ? eq : Object.values(eq || {})).filter((it) => it && !it.ruined && TYPE_BY_ID[it.type]);
   // 장착 아이템 → 테마별 개수 [6] (흔적은 안 셈)
   function setCounts(equippedItems) {
-    const list = Array.isArray(equippedItems) ? equippedItems : Object.values(equippedItems || {});
     const n = I.THEMES.map(() => 0);
-    for (const it of list) if (it && !it.ruined && TYPE_BY_ID[it.type]) n[themeOf(it)]++;
+    for (const it of listOf(equippedItems)) n[themeOf(it)]++;
     return n;
   }
-  // 켜진 세트 효과 합 {stat: %} (4개·7개 효과는 겹쳐 받음)
-  function setBonus(counts) {
+  // 켜진 세트 효과 합 {stat: %}. 4개·7개 효과는 겹쳐 받고, 각 효과 × gradeMult[그 세트를 이루는 장비 중 가장 낮은 등급]
+  function setBonus(equippedItems) {
     const out = {};
-    counts.forEach((n, th) => I.SET.counts.forEach((need, i) => {
-      if (n < need) return;
-      for (const [k, v] of Object.entries(I.SET.effects[th][i])) out[k] = clean((out[k] || 0) + v);
-    }));
+    const grades = I.THEMES.map(() => []);
+    for (const it of listOf(equippedItems)) grades[themeOf(it)].push(it.grade);
+    grades.forEach((gs, th) => {
+      gs.sort((a, b) => b - a);
+      I.SET.counts.forEach((need, i) => {
+        if (gs.length < need) return;
+        const m = I.SET.gradeMult[gs[need - 1]];
+        for (const [k, v] of Object.entries(I.SET.effects[th][i])) out[k] = clean((out[k] || 0) + v * m);
+      });
+    });
     return out;
+  }
+  // 화면용: 테마 th의 세트 단계별 배율 [4세트, 7세트] (안 켜졌으면 null)
+  function setMults(equippedItems, th) {
+    const gs = listOf(equippedItems).filter((it) => themeOf(it) === th).map((it) => it.grade).sort((a, b) => b - a);
+    return I.SET.counts.map((need) => (gs.length >= need ? I.SET.gradeMult[gs[need - 1]] : null));
   }
 
   // ----- 잠재능력 -----
@@ -207,13 +218,15 @@
 
   // 합성 시도. 재료는 성공·실패 모두 소멸(엔진이 처리).
   // → { success, item?, rate, jjam(실패 보상), failStreak(새 연속 실패 수) }. 잘못된 재료면 throw
-  function merge(items, rng, failStreak, nextId) {
+  // pickType: 결과 종류(테마)를 재료 중에서 고름 (2026-11-05: 세트를 맞출 수단). 재료에 없는 종류면 무시하고 무작위
+  function merge(items, rng, failStreak, nextId, pickType) {
     const err = mergeError(items);
     if (err) throw new Error(err);
     const streak = Math.max(0, toInt(failStreak));
     const rate = mergeRate(streak);
     if (!(rng() < rate)) return { success: false, rate, jjam: MERGE.failJjam, failStreak: streak + 1 };
-    const src = items[Math.min(items.length - 1, Math.floor(rng() * items.length))];
+    const rnd = items[Math.min(items.length - 1, Math.floor(rng() * items.length))]; // 난수는 고를 때도 똑같이 씀
+    const src = (pickType && items.find((x) => x.type === pickType)) || rnd;
     const item = createItem({
       id: nextId,
       type: src.type,
@@ -254,7 +267,7 @@
         }
       }
     }
-    for (const [k, v] of Object.entries(setBonus(setCounts(list)))) src.set[k].pct += v;
+    for (const [k, v] of Object.entries(setBonus(list))) src.set[k].pct += v;
     for (const k of Object.keys(extra || {})) {
       if (!src.extra[k]) continue;
       const v = extra[k];
@@ -335,6 +348,6 @@
     createItem, itemName, mainStat, mainValue, subValues, flatBase, rollPotentials,
     appraiseCost, reappraiseCost, maxLocks, enhanceRate, enhanceCost, enhanceCostMult, enhanceOdds, rollEnhance, restoreCost,
     mergeRate, mergeError, merge, dismantleValue, computeBonuses, codexKey, codexBonus,
-    themeOf, setCounts, setBonus, themeCodex,
+    themeOf, setCounts, setBonus, setMults, themeCodex,
   };
 })(globalThis.Game = globalThis.Game || {});

@@ -11,6 +11,15 @@
   const monthKey = (ms) => { const t = new Date(ms + KST); return t.getUTCFullYear() * 100 + t.getUTCMonth() + 1; };
 
   // ----- 출석 (30칸 주기) -----
+  // 구독(야근 패스)·월정액 매일 보상 [⚖ 2026-11-05 봇 240판: 소과금 체감] — 오늘 출석을 받을 때 같이 지급 (지난 날 채우기엔 없음). 서버가 기간 확인
+  const PASS = {
+    subDaily: 500, // 야근 패스(구독, ₩5,500/30일): 2배속·방치 +4시간·부서 +4시간 + 매일 성과급
+    monthlyDaily: 1000, // 월정액(₩5,500/30일): 즉시 법카 monthlyCorp + 매일 성과급
+    monthlyCorp: 500,
+    monthlyDays: 30,
+    monthlyKrw: 5500,
+    bonus: (sub, monthly) => (sub ? PASS.subDaily : 0) + (monthly ? PASS.monthlyDaily : 0),
+  };
   const ATT = {
     days: 30,
     maxFills: 5,
@@ -238,7 +247,7 @@
   G.Meta = {
     dayNum, weekNum, monthKey,
     GUIDE, guideDef, guideProgress, guideServerCheck,
-    ATT, attFresh, attSync, attStatus, attClaim, attFill,
+    ATT, PASS, attFresh, attSync, attStatus, attClaim, attFill,
     MIS, misFresh, misSync, misTrack, misStatus, misClaim,
     TOWER, towerFresh, towerSync, towerFloorReward, towerBuffs,
   };

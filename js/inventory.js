@@ -311,7 +311,7 @@
   }
 
   // ----- 합성: 같은 부위·등급 4개 → 다음 등급. 재료는 성공·실패 모두 소멸 -----
-  function merge(st, h0, ids) {
+  function merge(st, h0, ids, pickType) {
     const h = hooks(h0);
     if (!Array.isArray(ids)) return no(`같은 부위·등급 아이템 ${I.MERGE.count}개가 필요해요`);
     const items = ids.map((id) => find(st, id));
@@ -319,7 +319,7 @@
     const err = Eq.mergeError(items, kept(st));
     if (err) return no(err);
     const grade = items[0].grade;
-    const r = Eq.merge(items, h.rng, st.mergeFail[grade], st.nextItemId);
+    const r = Eq.merge(items, h.rng, st.mergeFail[grade], st.nextItemId, typeof pickType === 'string' ? pickType : undefined);
     removeIds(st, ids);
     st.mergeFail[grade] = r.failStreak;
     st.jjam += r.jjam;

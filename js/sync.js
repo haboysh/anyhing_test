@@ -121,7 +121,7 @@
     Y.restore = (id) => run(() => E.restore(id), 'restore', { id });
     Y.appraise = (id) => run(() => E.appraise(id), 'appraise', { id });
     Y.reappraise = (id, locks = []) => run(() => E.reappraise(id, locks), 'reappraise', { id, locks });
-    Y.merge = (ids) => run(() => E.merge(ids), 'merge', { ids });
+    Y.merge = (ids, type) => run(() => E.merge(ids, type), 'merge', { ids, type });
     Y.mergeAll = (grade) => run(() => E.mergeAll(grade), 'mergeAll', { grade });
     Y.dismantle = (ids) => run(() => E.dismantle(ids), 'dismantle', { ids });
     Y.dismantleBelow = (grade) => run(() => E.dismantleBelow(grade), 'dismantleBelow', { grade });
@@ -525,7 +525,8 @@
       E.setWallet(r.wallet);
       const item = r.inv && r.inv.ret ? E.localize(r.inv.ret).item || null : null;
       onChange();
-      return res.ok ? { ...res, item } : { ok: true, ...r.reward, day: r.day, item };
+      const pass = typeof r.pass === 'number' ? r.pass : 0; // 구독·월정액 매일 성과급 (서버)
+      return res.ok ? { ...res, item, pass } : { ok: true, ...r.reward, day: r.day, item, pass };
     }
     Y.claimAttendance = () => {
       if (!online) return local(E.claimAttendance());
@@ -686,6 +687,7 @@
       return guard(async () => {
         const r = await cloud.purchaseTest(productId);
         E.setWallet(r.wallet);
+        if (r.monthly && Sub && Sub.setMonthly) Sub.setMonthly({ until: r.monthly });
         onChange();
         return { ok: true };
       });
@@ -790,6 +792,7 @@
         } else rev = 0;
         cloud.setMeta({ uid: cloud.uid(), rev });
         if (h.sub && Sub) Sub.setServer(h.sub);
+        if (Sub && Sub.setMonthly) Sub.setMonthly(h.monthly);
         E.setWallet(h.wallet);
         E.setGachaState(h.gacha && h.gacha.acc, 'acc');
         E.setGachaState(h.gacha && h.gacha.equip, 'equip');

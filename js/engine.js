@@ -98,10 +98,17 @@
       const out = Eq.codexBonus(E.S.codex);
       const add = (b) => { for (const k of Object.keys(b)) if (I.STATS[k]) out[k] = { pct: ((out[k] && out[k].pct) || 0) + b[k], flat: (out[k] && out[k].flat) || 0 }; };
       add(G.Net.bonus(E.S.net, E.S.dept.conquered));
-      add(E.petBonus());
+      // 반려는 책상에 올린 효과만 여기 (보유 효과 공격력은 따로 곱함: E.petHoldMult)
+      const pb = { ...E.petBonus() };
+      if (pb.atk) pb.atk -= E.petHoldPct();
+      add(pb);
       return out;
     };
     E.petBonus = () => G.Pets.bonus(E.S.pet, E.S.pet.out, E.S.maxStage);
+    // 과금 콘텐츠 보유 효과는 장비 %와 따로 곱함 (2026-11-05: 같은 칸에 더하면 과금해도 거의 안 세짐 — docs/balance-check-2026-11-05.md)
+    E.petHoldPct = () => (G.Pets.isOpen(E.S.maxStage) ? G.Pets.holdTotal(E.S.pet) : 0);
+    E.petHoldMult = () => 1 + E.petHoldPct() / 100;
+    E.skillHoldMult = () => 1 + G.Skills.holdAtkPct(E.S.skills) / 100;
     E.petRestCut = () => Math.min(0.9, (E.petBonus().rest || 0) / 100);
     E.bonuses = function () {
       if (!bonusCache || bonusFor !== E.S) {
@@ -124,10 +131,10 @@
     E.promoMult = () => Math.pow(F.PROMO_MULT, E.rankLevel());
     // 스킬 없이 (방치 보상·전투력 계산용)
     // 뽑기 레벨 보너스: 장비·장신구 뽑기 레벨마다 최종 업무력 +% (서로 곱함)
-    E.gachaAtkMult = () => ['equip', 'acc'].reduce((m, k) => m * (1 + G.Gacha.CONFIG.LEVEL_ATK[G.Gacha.levelFor(E.S.gacha[k].count)] / 100), 1);
-    const atkBase = () => UPGRADES.atk.value(E.S.lv.atk) * PERKS.dmg.value(E.S.perk.dmg) * E.promoMult() * T('atk') * E.gachaAtkMult();
+    E.gachaAtkMult = () => G.Gacha.CONFIG.LEVEL_KINDS.filter((k) => E.S.gacha[k]).reduce((m, k) => m * (1 + G.Gacha.CONFIG.LEVEL_ATK[G.Gacha.levelFor(E.S.gacha[k].count)] / 100), 1);
+    const atkBase = () => UPGRADES.atk.value(E.S.lv.atk) * PERKS.dmg.value(E.S.perk.dmg) * E.promoMult() * T('atk') * E.gachaAtkMult() * E.petHoldMult() * E.skillHoldMult();
     // 업무 스킬 보유 효과도 업무력 %에 더함
-    const withAtk = (base) => base * (1 + pct('atk') + tb('atk') + G.Skills.holdAtkPct(E.S.skills) / 100) + flat('atk');
+    const withAtk = (base) => base * (1 + pct('atk') + tb('atk')) + flat('atk');
     const withAps = (base) => base * (1 + pct('aspd')) * T('aspd');
     E.atkNoSkill = () => withAtk(atkBase());
     // 야근 모드: 장비 깡수치까지 포함한 최종 공격력의 3배
@@ -180,17 +187,17 @@
     // 스탯 설명 창: 무엇인지 + 어떻게 계산되는지 (k: 'x' 곱하기 · '+' 더하기 · '%' 퍼센트 더하기 · '=' 결과)
     E.statInfo = function (name) {
       const P = (v) => ['%', v * 100];
-      const atkPct = pct('atk') + tb('atk') + G.Skills.holdAtkPct(E.S.skills) / 100;
+      const atkPct = pct('atk') + tb('atk');
       const hpPct = pct('hp') + tb('hp');
       const INFO = {
         '전투력': { desc: '이직 합격 확률과 회사 요구 전투력을 비교할 때 쓰는 종합 점수예요.',
           formula: '(10 × 초당 기대 데미지 + 2 × 체력) × (1 + 0.5 × 멘탈 + 0.2 × 꿀잠)',
           parts: [['초당 기대 데미지', 'n', E.dps()], ['체력', 'n', E.maxHp()], ['멘탈', ...P(E.mentalChance())], ['꿀잠', ...P(E.sleepCut())]] },
         '업무력': { desc: '한 번 칠 때 적에게 주는 기본 데미지예요. (공격력)',
-          formula: '근로 강화 × 학벌 × 직급 보너스 × 사풍 × 뽑기 레벨 × (1 + 장비·인맥·반려·도감·타워·스킬 보유 %) + 장비 깡수치',
+          formula: '근로 강화 × 학벌 × 직급 보너스 × 사풍 × 뽑기 레벨 × 반려 보유 × 스킬 보유 × (1 + 장비·인맥·책상 반려·도감·타워 %) + 장비 깡수치',
           parts: [['근로 강화 (Lv.' + E.S.lv.atk + ')', 'n', UPGRADES.atk.value(E.S.lv.atk)], ['학벌 특전', 'x', PERKS.dmg.value(E.S.perk.dmg)], ['직급 보너스', 'x', E.promoMult()],
-            ['사풍', 'x', T('atk')], ['뽑기 레벨', 'x', E.gachaAtkMult()], ['장비·인맥·반려·도감', '%', pct('atk') * 100], ['야근 타워', '%', tb('atk') * 100],
-            ['업무 스킬 보유', '%', G.Skills.holdAtkPct(E.S.skills)], ['장비 깡수치', '+', flat('atk')]], total: E.atkNoSkill(), extra: atkPct },
+            ['사풍', 'x', T('atk')], ['뽑기 레벨', 'x', E.gachaAtkMult()], ['반려 보유 효과', 'x', E.petHoldMult()], ['업무 스킬 보유 효과', 'x', E.skillHoldMult()],
+            ['장비·인맥·책상 반려·도감', '%', pct('atk') * 100], ['야근 타워', '%', tb('atk') * 100], ['장비 깡수치', '+', flat('atk')]], total: E.atkNoSkill(), extra: atkPct },
         '체력': { desc: '적에게 맞으면 줄어들고, 0이 되면 번아웃(휴식)이에요.',
           formula: '근로 강화 × 강철 체력 × 직급 보너스 × 사풍 × (1 + 장비·인맥·반려·도감·타워 %) + 장비 깡수치',
           parts: [['근로 강화 (Lv.' + E.S.lv.hp + ')', 'n', UPGRADES.hp.value(E.S.lv.hp)], ['강철 체력 특전', 'x', PERKS.hp.value(E.S.perk.hp)], ['직급 보너스', 'x', E.promoMult()],
@@ -454,18 +461,24 @@
         if (E.S.kill >= F.KILLS_PER_STAGE) {
           E.S.kill = 0;
           if (E.S.autoAdvance) advance();
+          // 자동 진행이 꺼져 있어도 맨 위 층을 다 처리하면 다음 층은 열림 (자리는 그대로) — 서버 진행 장부와 같게 (서버가 한 층 앞서가지 않게)
+          else if (E.mode === 'main' && E.S.stage === E.S.runMax) reach(E.S.stage + 1);
         }
       }
     }
 
     function advance() {
-      const oldLv = E.rankLevel();
       E.S.stage++;
       E.S.kill = 0;
-      const newRun = E.S.stage > E.S.runMax;
+      reach(E.S.stage);
+    }
+    // 층 f까지 열림 (새 최고면 기록·승진·수습·해금). advance는 그 층으로 옮긴 뒤, 자동 진행 꺼짐이면 자리는 그대로
+    function reach(f) {
+      const oldLv = E.rankLevel();
+      const newRun = f > E.S.runMax;
       const wasShort = E.mode === 'main' && E.S.prestiges > 0 && E.careerShort();
-      E.S.runMax = Math.max(E.S.runMax, E.S.stage);
-      E.S.maxStage = Math.max(E.S.maxStage, E.eff());
+      E.S.runMax = Math.max(E.S.runMax, f);
+      E.S.maxStage = Math.max(E.S.maxStage, E.eff(f));
       if (newRun) track('floor');
       // 수습 범위(시작 층 +10층)를 넘게 올라가면 수습 탈락 해제 → 평소처럼 경력·이직 보상·층 조건 (2026-10-27 사용자)
       if (E.S.probation.failed && E.S.runMax >= E.S.runStart + PROBATION.floors) {
@@ -1200,7 +1213,7 @@
     };
 
     // 합성 (같은 부위·등급 4개 → 다음 등급) · 일괄 합성 · 분해 · 보호
-    E.merge = (ids) => Inv.merge(E.S, H, ids);
+    E.merge = (ids, type) => Inv.merge(E.S, H, ids, type);
     E.mergeAll = (maxGrade) => Inv.mergeAll(E.S, H, maxGrade);
     E.mergeCount = (maxGrade) => Inv.mergeCount(E.S, maxGrade);
     E.dismantle = (ids) => Inv.dismantle(E.S, H, ids);
