@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+  <meta name="theme-color" content="#17142e">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="야근키우기">
+  <title>야근 직장인 키우기</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="apple-touch-icon" href="icons/icon-180.png">
+  <link rel="icon" href="icons/icon-192.png">
+  <link rel="preload" href="fonts/Pretendard-Bold.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="theme.css">
+  <script src="js/format.js" defer></script>
+  <script src="js/data.js" defer></script>
+  <script src="js/items.js" defer></script>
+  <script src="js/equipment.js" defer></script>
+  <script src="js/gacha.js" defer></script>
+  <script src="js/drops.js" defer></script>
+  <script src="js/skills.js" defer></script>
+  <script src="js/inventory.js" defer></script>
+  <script src="js/depts.js" defer></script>
+  <script src="js/net.js" defer></script>
+  <script src="js/pets.js" defer></script>
+  <script src="js/companies.js" defer></script>
+  <script src="js/career.js" defer></script>
+  <script src="js/meta.js" defer></script>
+  <script src="js/rewards.js" defer></script>
+  <script src="js/rates.js" defer></script>
+  <script src="js/board.js" defer></script>
+  <script src="js/guide-text.js" defer></script>
+  <script src="js/state.js" defer></script>
+  <script src="js/storage.js" defer></script>
+  <script src="vendor/supabase.js" defer></script>
+  <script src="js/config.js" defer></script>
+  <script src="js/cloud.js" defer></script>
+  <script src="js/engine.js" defer></script>
+  <script src="js/subscription.js" defer></script>
+  <script src="js/sync.js" defer></script>
+  <script src="js/sprites.js" defer></script>
+  <script src="js/ui-guide.js" defer></script>
+  <script src="js/ui.js" defer></script>
+  <script src="js/main.js" defer></script>
+</head>
+<body>
+  <div id="app">
+    <div id="top">
+    <div id="wallet">
+      <div class="cur c-gold"><span class="cur-k">재산</span><b id="cur-gold"></b></div>
+      <div class="cur c-bonus"><span class="cur-k">성과급</span><b id="cur-bonus"></b></div>
+      <div class="cur c-corp"><span class="cur-k">법카</span><b id="cur-corp"></b></div>
+      <div class="cur c-jjam" hidden><span class="cur-k">짬</span><b id="cur-jjam"></b></div>
+      <div class="cur c-shards" hidden><span class="cur-k">조각</span><b id="cur-shards"></b></div>
+      <div class="cur c-career" hidden><span class="cur-k">경력</span><b id="cur-career"></b></div>
+      <div class="cur c-stamps" hidden><span class="cur-k">도장</span><b id="cur-stamps"></b></div>
+      <button id="wallet-all" class="cur-all" aria-label="재화 전체 보기">재화 전체</button>
+    </div>
+    <header id="hud">
+      <div class="hud-left">
+        <div id="company"></div>
+        <div id="rank"></div>
+      </div>
+      <div class="hud-right">
+        <div id="stage"></div>
+      </div>
+    </header>
+
+    <section id="battle">
+      <div id="boss-timer"><div class="bar"><div id="boss-fill"></div><span id="boss-text"></span></div></div>
+
+      <div class="fighters">
+        <div class="side">
+          <div class="actor-wrap player-wrap">
+            <div class="ground"></div>
+            <div id="player-buffs"></div>
+            <div id="rig"><img id="wpn-kb" src="img/chars/w-keyboard.png" width="80" height="33" alt=""><img id="player" class="px actor" alt=""><img id="wpn-mouse" src="img/chars/w-mouse.png" width="32" height="60" alt=""><img id="fist" src="img/chars/fist0.png" width="97" height="145" alt=""></div>
+            <img id="desk" class="px" alt="">
+            <span id="desk-pet" hidden></span>
+          </div>
+          <div class="bar mental"><div id="mental-ghost"></div><div id="mental-fill"></div><span id="mental-text"></span></div>
+          <div class="label">체력</div>
+        </div>
+        <div class="side">
+          <div class="actor-wrap"><div class="ground"></div><img id="enemy" class="px actor" alt=""><div id="enemy-line" aria-hidden="true"><img alt=""><img alt=""></div></div>
+          <div class="bar hp"><div id="enemy-ghost"></div><div id="enemy-fill"></div><span id="enemy-text"></span></div>
+          <div class="label" id="enemy-name"></div>
+        </div>
+      </div>
+
+      <div id="fx"></div>
+      <button id="postit" class="postit" hidden></button>
+      <button id="postit-fold" class="postit-fold" hidden aria-label="사수 메모 접기"></button>
+      <div id="side-icons">
+        <button id="si-board" aria-label="사내 게시판"><svg viewBox="0 0 24 24" width="26" height="26" aria-hidden="true"><rect x="2.5" y="4.5" width="19" height="15" rx="1.5" fill="#8a6440" stroke="#0f1312" stroke-width="1.6"/><rect x="5" y="7" width="7.5" height="9" fill="#f3f4f0"/><rect x="13.8" y="7.6" width="5.6" height="5.4" fill="#ecdc4a"/><path d="M6.4 9.6h4.6M6.4 11.8h4.6M6.4 14h3" stroke="#5d646c" stroke-width="1.1"/><circle cx="8.7" cy="6.8" r="1.5" fill="#c3392f" stroke="#0f1312" stroke-width=".8"/><circle cx="16.6" cy="7.4" r="1.3" fill="#2b4c9e" stroke="#0f1312" stroke-width=".8"/></svg><span>게시판</span></button>
+        <button id="si-att" aria-label="출석"><img src="img/ui/attend.png" alt=""><span>출석</span></button>
+        <button id="si-mis" aria-label="미션"><img src="img/ui/mission.png" alt=""><span>미션</span></button>
+        <button id="si-ach" aria-label="업적"><img src="img/ui/achieve.png" alt=""><span>업적</span></button>
+        <button id="si-set" aria-label="설정"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><circle cx="12" cy="12" r="3.2"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M5.3 18.7l2.1-2.1M16.6 7.4l2.1-2.1"/></svg><span>설정</span></button>
+      </div>
+      <div class="battle-buttons">
+        <button id="btn-advance"></button>
+        <div class="skills">
+          <div class="mini-col">
+            <button id="btn-speed" class="mini">x2</button>
+            <button id="btn-autoskill" class="mini">AUTO</button>
+          </div>
+          <button id="skill-coffee" class="skill"><span class="cd"></span></button>
+          <button id="skill-night" class="skill"><span class="cd"></span></button>
+        </div>
+      </div>
+    </section>
+
+    </div>
+    <div id="bottom">
+    <nav id="tabs">
+      <button class="tab" data-tab="grow"><img src="img/ui/tab-work.png" alt="">근로</button>
+      <button class="tab" data-tab="equip"><img src="img/ui/tab-equip.png" alt="">장비</button>
+      <button class="tab" data-tab="skill"><img src="img/ui/stamp.png" alt="">스킬</button>
+      <button class="tab" data-tab="office"><img src="img/ui/tab-office.png" alt="">사내</button>
+      <button class="tab" data-tab="gacha"><img src="img/ui/tab-shop.png" alt="">상점</button>
+      <button class="tab" data-tab="quit"><img src="img/ui/tab-quit.png" alt="">이직</button>
+    </nav>
+    <section id="panel-body"></section>
+    </div>
+
+    <div id="toast"></div>
+    <div id="net-gate" hidden><div class="modal-box"><h3>인터넷 연결이 필요해요</h3><p id="net-msg"></p><button id="net-retry">다시 연결</button><p id="net-tip" class="net-tip"></p></div></div>
+    <div id="intro" hidden></div>
+    <div id="sheet"><div class="sheet-box" id="sheet-box"></div></div>
+    <div id="layer"><div class="layer-box" id="layer-box" role="dialog" aria-modal="true"></div></div>
+    <div id="modal">
+      <div class="modal-box">
+        <h3 id="modal-title"></h3>
+        <div id="modal-body"></div>
+        <button id="modal-ok">확인</button>
+        <button id="modal-cancel" hidden>취소</button>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
