@@ -605,8 +605,9 @@
     function showSettings() {
       const S = E.S;
       showModal('설정', `<div class="settings">
-          <div class="act-row wrap">${[['lowPower', '저전력 모드'], ['shake', '화면 흔들림'], ['dmgNumbers', '데미지 숫자'], ['fx', '효과']].map(([k, n]) =>
-            `<button class="act-btn ${E.fxOn(k) || (k === 'lowPower' && S.settings.lowPower) ? 'on' : ''}" data-set="${k}" ${k !== 'lowPower' && S.settings.lowPower ? 'disabled' : ''}>${n}</button>`).join('')}</div>
+          <div class="set-grid">${[['lowPower', '저전력 모드'], ['shake', '화면 흔들림'], ['dmgNumbers', '데미지 숫자'], ['fx', '타격 연출']].map(([k, n]) => {
+            const on = E.fxOn(k) || (k === 'lowPower' && S.settings.lowPower);
+            return `<button class="set-tg ${on ? 'on' : ''}" data-set="${k}" ${k !== 'lowPower' && S.settings.lowPower ? 'disabled' : ''}><span>${n}</span><b>${on ? 'ON' : 'OFF'}</b></button>`; }).join('')}</div>
           <div class="stat-line">최고 ${S.maxStage}층 · 이직 ${S.prestiges}회 · 전투력 <b>${fmt(E.power())}</b></div>
           ${accountBox()}
           ${bonusBox()}
@@ -1927,7 +1928,7 @@
           <button class="act-btn" data-act="acct-apple">Apple로 연결</button>
         </div>` : ''}
         <div class="act-row">
-          <button class="act-btn" data-act="acct-save">지금 클라우드 저장</button>
+          <button class="act-btn" data-act="acct-save">지금 저장</button>
           <button class="act-btn danger-lite" data-act="acct-delete" ${uid ? '' : 'disabled'}>계정 삭제</button>
         </div></div>`;
     }
