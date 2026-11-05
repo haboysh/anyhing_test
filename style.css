@@ -30,7 +30,7 @@ body {
   background: linear-gradient(180deg, var(--bg2), var(--bg) 60%);
   display: flex; flex-direction: column;
   padding-top: env(safe-area-inset-top);
-  padding-bottom: env(safe-area-inset-bottom);
+  /* 아래 여백은 #panel-body 안에서 (패널 배경을 화면 맨 끝까지 — 둥근 모서리 폰에서 잘린 모서리 안 보이게) */
 }
 button { font: inherit; color: inherit; border: none; cursor: pointer; letter-spacing: inherit; }
 img.px { image-rendering: pixelated; display: block; }
@@ -160,7 +160,7 @@ button:active { transform: translateY(2px) scale(.98); }
 #tabs { display: flex; gap: 4px; margin: 6px 10px 2px; padding: 4px; border-radius: 16px; background: rgba(0, 0, 0, .3); border: 1px solid var(--card-line); }
 .tab { flex: 1; padding: 7px 0; background: none; color: var(--sub); font-weight: 800; font-size: 14px; border-radius: 12px; }
 .tab.active { color: #2a1a00; background: linear-gradient(180deg, #ffe07a, #ffb52e); box-shadow: 0 3px 10px rgba(255, 170, 40, .35); }
-#panel-body { flex: 1; overflow-y: auto; padding: 8px 14px 16px; -webkit-overflow-scrolling: touch; }
+#panel-body { flex: 1; overflow-y: auto; padding: 8px 14px calc(16px + env(safe-area-inset-bottom)); -webkit-overflow-scrolling: touch; }
 
 .buy-mode { display: flex; gap: 6px; justify-content: flex-end; margin-bottom: 8px; }
 .buy-mode button { padding: 6px 12px; font-size: 12px; font-weight: 800; color: var(--sub); background: var(--card); border-radius: 999px; border: 1px solid var(--card-line); }
@@ -407,7 +407,7 @@ b.subst { color: var(--gold2); }
 .bag-cell { position: relative; }
 .bag-cell .up { position: absolute; right: 2px; top: 1px; font-style: normal; font-size: 11px; color: #4ade80; text-shadow: 0 1px 2px #000; }
 .filter-row { margin-bottom: 8px; }
-.bag-dock { position: sticky; bottom: -16px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin: 10px -14px -16px; padding: 8px 10px calc(8px + env(safe-area-inset-bottom)); background: var(--bg); border-top: 1px solid var(--card-line); z-index: 3; }
+.bag-dock { position: sticky; bottom: calc(-16px - env(safe-area-inset-bottom)); display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin: 10px -14px calc(-16px - env(safe-area-inset-bottom)); padding: 8px 10px calc(8px + env(safe-area-inset-bottom)); background: var(--bg); border-top: 1px solid var(--card-line); z-index: 3; }
 .bag-dock button { min-height: 44px; border-radius: 12px; font-size: 12px; font-weight: 800; background: var(--card); border: 1px solid var(--card-line); }
 .c-stamps { --dot: #e5484d; }
 .cur { padding: 2px 4px; gap: 2px; }
