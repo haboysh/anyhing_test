@@ -289,11 +289,11 @@
     const itemName = (it) => Eq.itemName(it);
     const gradeTag = (g) => `<span class="gtag" style="color:${GR[g].color}">${GR[g].name}</span>`;
     const slotGlyph = (slot) => I.SLOTS[slot].name[0];
-    // 아이템 아이콘 (임시: 부위 글자 + 종류 번호 + 등급 색 배경)
+    // 아이템 아이콘: 종류 그림(www/img/items/<type>.png) + 등급 색 배경
     function itemIcon(it, opt = {}) {
       const c = GR[it.grade].color;
       return `<div class="it-icon" style="--gc:${c};background:linear-gradient(160deg, ${c}70, ${c}1c 72%), #1d2422">
-        <span class="g">${slotGlyph(it.slot)}</span><span class="tn">${it.type.slice(it.slot.length)}</span>
+        <img class="it-img" src="img/items/${it.type}.png" alt="" loading="lazy" onerror="this.remove()">
         ${it.plus ? `<span class="pl">+${it.plus}</span>` : ''}
         ${!it.appraised ? '<span class="q">?</span>' : ''}
         ${it.protected ? `<span class="lk">${ICON.lock}</span>` : ''}

@@ -811,3 +811,6 @@ body.low-power *, body.low-power *::before, body.low-power *::after { animation:
 .set-tg.on b { background: var(--stamp); color: #fff; }
 .set-tg:disabled { opacity: .45; }
 .acct-box .act-btn { white-space: nowrap; }
+
+/* 장비 그림 (2026-11-05, Gemini 42종) */
+.it-icon .it-img { width: 84%; height: 84%; object-fit: contain; image-rendering: pixelated; filter: drop-shadow(0 1px 0 rgba(0,0,0,.45)); }
