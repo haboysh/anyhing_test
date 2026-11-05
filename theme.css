@@ -68,6 +68,9 @@ button:active { transform: translateY(2px); }
 /* ----- 전투 창 ----- */
 #battle { background-color: #26302c; border-radius: 6px; border: 3px solid var(--edge); box-shadow: 0 4px 0 var(--edge); }
 .bar { height: 14px; border-radius: 2px; background: #0d1110; border: 2px solid var(--edge); box-shadow: none; }
+/* 막대 안 숫자: 안쪽 10px에 맞게 작고 선명한 글꼴 (픽셀 글꼴은 줄이면 흐려짐), 휴식은 더 작게 — 2026-11-05 사용자 */
+.bar span { font-family: 'Pretendard', sans-serif; font-size: 9.5px; font-weight: 800; line-height: 1; letter-spacing: -.1px; }
+.bar span.rest { font-size: 8.5px; letter-spacing: -.2px; color: #fff; text-shadow: 0 0 2px #0f1312, 0 0 2px #0f1312, 0 1px 0 #0f1312; }
 .bar > div { border-radius: 0; }
 .bar > div::after { left: 0; right: 0; top: 0; height: 3px; border-radius: 0; background: rgba(255, 255, 255, .25); }
 .mental > div { background: #3f72d8; }
@@ -731,7 +734,10 @@ button.wa-row { cursor: pointer; }
 .pet-card.off .pc-name { color: var(--ink-sub); }
 .pet-card.on { border-color: var(--ink); box-shadow: inset 0 0 0 2px var(--hilite), 0 2px 0 var(--ink); }
 .pc-name { font-family: 'Galmuri11', sans-serif; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: flex; align-items: baseline; gap: 4px; }
-.pc-name small { font-family: inherit; font-size: 9.5px; color: var(--ink); background: var(--hilite); padding: 0 3px; border: 1px solid var(--ink); }
+.pc-name .pc-n { overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.pet-card { position: relative; }
+/* 책상 위: 카드 오른쪽 위 모서리 딱지 (이름 옆에 두면 이름이 잘림) */
+.pc-name small { position: absolute; top: -6px; right: -4px; transform: rotate(3deg); flex: none; font-family: inherit; font-size: 9.5px; color: var(--ink); background: var(--hilite); padding: 0 3px; border: 1px solid var(--ink); }
 .pc-cells { display: grid; grid-template-columns: repeat(4, 1fr); border: 1.5px solid var(--ink); background: #fff; min-width: 0; }
 .pc-cells span { display: flex; flex-direction: column; align-items: center; border-right: 1px solid var(--ink); line-height: 1.1; padding-bottom: 1px; }
 .pc-cells span:last-child { border-right: none; }

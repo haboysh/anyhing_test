@@ -488,6 +488,7 @@
       setStyle($('mental-fill'), 'width', Math.round(hpPct * 10) / 10 + '%');
       hpGhost.follow(hpPct);
       setText($('mental-text'), E.isResting() ? `휴식 ${E.restTimer.toFixed(1)}초` : `${fmt(Math.max(0, E.hp))} / ${fmt(mm)}`);
+      $('mental-text').classList.toggle('rest', E.isResting());
       const en = E.enemy;
       if (en) {
         setText($('enemy-name'), en.name);
@@ -1826,7 +1827,7 @@
         const cards = info.list.filter((x) => x.grade === gi).map((x) => {
           const cells = PT.TIERS.map((t, ti) => `<span class="${x.counts[ti] >= PT.CFG.mergeNeed ? 'full' : ''} ${ti === x.best ? 'best' : ''}"><i>${t}</i><b>${x.counts[ti]}</b></span>`).join('');
           return `<button class="pet-card ${x.owned ? '' : 'off'} ${x.out ? 'on' : ''}" data-pet="${x.key}" style="--gc:${GR[x.grade].color}">
-            ${petFace(x.key, x.best)}<span class="pc-name">${x.name}${x.out ? '<small>책상 위</small>' : ''}</span>
+            ${petFace(x.key, x.best)}<span class="pc-name"><span class="pc-n">${x.name}</span>${x.out ? '<small>책상 위</small>' : ''}</span>
             <span class="pc-cells" aria-label="D ${x.counts[0]}개, C ${x.counts[1]}개, B ${x.counts[2]}개, A ${x.counts[3]}개">${cells}</span></button>`;
         }).join('');
         return `<div class="pet-grade"><div class="pg-head" style="--gc:${g.color}"><i></i>${g.name}</div><div class="pet-row">${cards}</div></div>`;

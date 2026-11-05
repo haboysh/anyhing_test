@@ -1,5 +1,5 @@
 // 오프라인에서도 열리도록 캐시 (항상 최신 버전 우선)
-const CACHE = 'overtime-v17';
+const CACHE = 'overtime-v18';
 self.addEventListener('install', (e) => self.skipWaiting());
 self.addEventListener('activate', (e) => e.waitUntil(self.clients.claim()));
 self.addEventListener('fetch', (e) => {
