@@ -13,6 +13,20 @@
   <link rel="apple-touch-icon" href="icons/icon-180.png">
   <link rel="icon" href="icons/icon-192.png">
   <link rel="preload" href="fonts/Pretendard-Bold.woff2" as="font" type="font/woff2" crossorigin>
+  <script>
+    // 아이폰 홈 화면(앱 모드)에서 100dvh가 시계 줄만큼 짧게 잡히는 iOS 버그 → 실제 화면 높이로 맞춤
+    (function () {
+      if (!navigator.standalone) return;
+      var fit = function () {
+        var portrait = innerHeight >= innerWidth;
+        var h = portrait ? Math.max(innerHeight, screen.height) : innerHeight;
+        document.documentElement.style.setProperty('--app-h', h + 'px');
+      };
+      fit();
+      addEventListener('resize', fit);
+      addEventListener('orientationchange', function () { setTimeout(fit, 300); });
+    })();
+  </script>
   <link rel="stylesheet" href="style.css">
   <link rel="stylesheet" href="theme.css">
   <script src="js/format.js" defer></script>
@@ -59,6 +73,13 @@
       <div class="cur c-stamps" hidden><span class="cur-k">도장</span><b id="cur-stamps"></b></div>
       <button id="wallet-all" class="cur-all" aria-label="재화 전체 보기">재화 전체</button>
     </div>
+    <div id="side-icons">
+      <button id="si-board" aria-label="사내 게시판"><svg viewBox="0 0 24 24" width="26" height="26" aria-hidden="true"><rect x="2.5" y="4.5" width="19" height="15" rx="1.5" fill="#8a6440" stroke="#0f1312" stroke-width="1.6"/><rect x="5" y="7" width="7.5" height="9" fill="#f3f4f0"/><rect x="13.8" y="7.6" width="5.6" height="5.4" fill="#ecdc4a"/><path d="M6.4 9.6h4.6M6.4 11.8h4.6M6.4 14h3" stroke="#5d646c" stroke-width="1.1"/><circle cx="8.7" cy="6.8" r="1.5" fill="#c3392f" stroke="#0f1312" stroke-width=".8"/><circle cx="16.6" cy="7.4" r="1.3" fill="#2b4c9e" stroke="#0f1312" stroke-width=".8"/></svg><span>게시판</span></button>
+      <button id="si-att" aria-label="출석"><img src="img/ui/attend.png" alt=""><span>출석</span></button>
+      <button id="si-mis" aria-label="미션"><img src="img/ui/mission.png" alt=""><span>미션</span></button>
+      <button id="si-ach" aria-label="업적"><img src="img/ui/achieve.png" alt=""><span>업적</span></button>
+      <button id="si-set" aria-label="설정"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><circle cx="12" cy="12" r="3.2"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M5.3 18.7l2.1-2.1M16.6 7.4l2.1-2.1"/></svg><span>설정</span></button>
+    </div>
     <header id="hud">
       <div class="hud-left">
         <div id="company"></div>
@@ -94,13 +115,6 @@
       <div id="fx"></div>
       <button id="postit" class="postit" hidden></button>
       <button id="postit-fold" class="postit-fold" hidden aria-label="사수 메모 접기"></button>
-      <div id="side-icons">
-        <button id="si-board" aria-label="사내 게시판"><svg viewBox="0 0 24 24" width="26" height="26" aria-hidden="true"><rect x="2.5" y="4.5" width="19" height="15" rx="1.5" fill="#8a6440" stroke="#0f1312" stroke-width="1.6"/><rect x="5" y="7" width="7.5" height="9" fill="#f3f4f0"/><rect x="13.8" y="7.6" width="5.6" height="5.4" fill="#ecdc4a"/><path d="M6.4 9.6h4.6M6.4 11.8h4.6M6.4 14h3" stroke="#5d646c" stroke-width="1.1"/><circle cx="8.7" cy="6.8" r="1.5" fill="#c3392f" stroke="#0f1312" stroke-width=".8"/><circle cx="16.6" cy="7.4" r="1.3" fill="#2b4c9e" stroke="#0f1312" stroke-width=".8"/></svg><span>게시판</span></button>
-        <button id="si-att" aria-label="출석"><img src="img/ui/attend.png" alt=""><span>출석</span></button>
-        <button id="si-mis" aria-label="미션"><img src="img/ui/mission.png" alt=""><span>미션</span></button>
-        <button id="si-ach" aria-label="업적"><img src="img/ui/achieve.png" alt=""><span>업적</span></button>
-        <button id="si-set" aria-label="설정"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><circle cx="12" cy="12" r="3.2"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M5.3 18.7l2.1-2.1M16.6 7.4l2.1-2.1"/></svg><span>설정</span></button>
-      </div>
       <div class="battle-buttons">
         <button id="btn-advance"></button>
         <div class="skills">
