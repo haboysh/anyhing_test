@@ -80,8 +80,9 @@
     // ----- 아이템·재료 작업: 서버 모드면 서버가 판정 (같은 inventory.js 규칙), 아니면 기기 엔진 -----
     const equippedIds = () => Object.values(E.S.equipped).filter((x) => Number.isInteger(x));
     // 재산(원)은 서버 진행 장부가 원본 (3단계) → 보내지 않음. 응답의 prog(서버 재산·레벨)로 맞춤
-    const keptIds = () => [...new Set([...equippedIds(), ...Object.values(E.S.presetAlt || {}).filter((x) => Number.isInteger(x))])];
-    const invBody = (extra) => ({ equipped: keptIds(), auto: E.S.autoAppraise, ...extra });
+    // 교체용 프리셋 장비는 따로 (서버: 보호만, 일괄 강화 '장착 중만'엔 안 들어감)
+    const altIds = () => Object.values(E.S.presetAlt || {}).filter((x) => Number.isInteger(x) && !equippedIds().includes(x));
+    const invBody = (extra) => ({ equipped: equippedIds(), kept: altIds(), auto: E.S.autoAppraise, ...extra });
     // 서버 응답 반영: 아이템·재화 + 재산·근로 강화는 서버 값(prog) + 아직 확정 안 된 내 기록 (r.gold 증감은 안 씀)
     function applyR(r) {
       if (!r || typeof r !== 'object') return;
@@ -529,7 +530,13 @@
       return res.ok ? { ...res, item, pass } : { ok: true, ...r.reward, day: r.day, item, pass };
     }
     Y.claimAttendance = () => {
-      if (!online) return local(E.claimAttendance());
+      if (!online) {
+        // 서버 없는 테스트판: 구독·월정액 매일 성과급도 기기에서 (정식판은 서버가 기간 확인)
+        const r = E.claimAttendance();
+        const pass = r.ok ? G.Meta.PASS.bonus(!!(Sub && Sub.isActive()), !!(Sub && Sub.monthlyUntil && Sub.monthlyUntil())) : 0;
+        if (pass) { E.S.bonus += pass; onChange(); }
+        return local(r.ok ? { ...r, pass } : r);
+      }
       if (!invReady) return notReady();
       return guard(async () => {
         const r = await cloud.attendance('claim', undefined, E.gachaFloor());
@@ -683,7 +690,10 @@
     };
     // 법카 구매 (실결제 연결 전: 테스트 결제). productId = 서버 PRODUCTS 키
     Y.testCorp = (amount, productId = 'corp_1000') => {
-      if (!online) return Promise.resolve(E.devGrant({ corp: amount }));
+      if (!online) {
+        if (productId === 'monthly_30' && Sub && Sub.setMonthlyForTest) Sub.setMonthlyForTest(G.Meta.PASS.monthlyDays);
+        return Promise.resolve(E.devGrant({ corp: amount }));
+      }
       return guard(async () => {
         const r = await cloud.purchaseTest(productId);
         E.setWallet(r.wallet);

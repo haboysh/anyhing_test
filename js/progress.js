@@ -455,7 +455,7 @@
     for (const k of SKILL_KEYS) {
       const cd = s0.skCd[k];
       let prev = B.su && typeof B.su[k] === 'number' ? B.su[k] : 1;
-      if (prev < 0 || newRun) prev = Math.max(prev, 1); // 열림·이직(폰 쿨타임 초기화) → 바로 1번
+      if (prev <= -1 || newRun) prev = Math.max(prev, 1); // 열림·이직(폰 쿨타임 초기화) → 바로 1번 (−1 = 잠김, 0~−skillSlack = 여유로 당겨 쓴 빚)
       givenS[k] = isFinite(cd) ? dt * speed / cd : 0;
       SU[k] = isFinite(cd) ? Math.min(Math.max(prev, suCap(cd)), prev + givenS[k]) : -1;
     }
@@ -618,13 +618,13 @@
         for (const j of SKILL_KEYS) {
           const cd = s.skCd[j];
           if (!isFinite(cd)) continue;
-          if (SU[j] < 0) SU[j] = 1; // 이 묶음에서 열림
+          if (SU[j] <= -1) SU[j] = 1; // 이 묶음에서 열림
           const want = dt * speed / cd;
           if (want > givenS[j]) { SU[j] = Math.min(Math.max(SU[j], suCap(cd)), SU[j] + want - givenS[j]); givenS[j] = want; }
         }
       }
       const n = Math.max(0, Math.min(n0, Math.floor(SU[k] + CFG.skillSlack)));
-      if (SU[k] >= 0) SU[k] = Math.max(0, SU[k] - n);
+      if (SU[k] > -1) SU[k] = Math.max(-CFG.skillSlack, SU[k] - n); // 여유로 당겨 쓴 만큼은 다음 통에서 뺌 (여유가 쌓여 5% 더 세지 않게)
       out.skillRej += n0 - n;
       stat('skill_' + k, n);
       mis(k, n);

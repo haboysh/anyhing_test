@@ -26,6 +26,8 @@
   // 장착 중 = 지금 장착 + 교체용 프리셋 (합성·분해·판매에서 보호. 서버는 폰이 equipped에 둘 다 보냄)
   const kept = (st) => [...Object.values(st.equipped || {}), ...Object.values(st.presetAlt || {})];
   const isEquipped = (st, id) => kept(st).some((x) => x === id);
+  // 지금 낀 것만 (일괄 강화 '장착 중만'): 교체용 프리셋은 보호만 하고 강화 대상은 아님
+  const worn = (st, id) => Object.values(st.equipped || {}).some((x) => x === id);
   function removeIds(st, ids) {
     const del = new Set(ids);
     const before = st.items.length;
@@ -288,7 +290,7 @@
   function enhanceAll(st, h0, o = {}) {
     const h = hooks(h0);
     const target = Math.min(ENHANCE_ALL_MAX, Number.isInteger(o.target) ? o.target : ENHANCE_ALL_MAX);
-    const pick = (it) => !it.ruined && it.plus < target && (o.scope === 'all' ? !it.protected || isEquipped(st, it.id) : isEquipped(st, it.id));
+    const pick = (it) => !it.ruined && it.plus < target && (o.scope === 'all' ? !it.protected || isEquipped(st, it.id) : worn(st, it.id));
     const sum = { tries: 0, gold: 0, stamps: 0, ups: 0, items: 0, stop: 'target' };
     const touched = new Set();
     let guard = 0;
@@ -501,7 +503,7 @@
   }
 
   G.Inv = {
-    hooks, bagSize, bagUsed, bagFree, find, isEquipped, create, add,
+    hooks, bagSize, bagUsed, bagFree, find, isEquipped, kept, create, add,
     kill, offline, shardBox, gradeBox, gacha, GACHA_KIND,
     appraise, reappraise, enhanceError, enhance, restoreCost, restore, autoEnhance, enhanceAll, ENHANCE_ALL_MAX, AUTO_MAX_TRIES,
     merge, mergeAll, mergeCount, dismantle, dismantleBelow, toggleProtect,

@@ -20,7 +20,7 @@
       { id: 'corp_1000', corp: 1000, krw: 1100 },
       { id: 'corp_5000', corp: 5000, krw: 5500 },
       { id: 'corp_10000', corp: 10000, krw: 11000 },
-      { id: 'monthly_30', corp: 500, krw: 5500, monthly: true, hidden: true }, // 월정액 (monthlyBox에서 팖)
+      { id: 'monthly_30', monthly: true, hidden: true }, // 월정액 (monthlyBox에서 팖, 숫자는 meta.js PASS)
     ],
     dev: { bonus: 10000, corp: 10000, goldK: 200, jjam: 100 }, // 개발용 지급 (재산 = K × goldK)
     bagFullToastSec: 8, // 가방 가득 알림 최소 간격
@@ -858,7 +858,7 @@
     let toolMode = null; // 'dis' | 'merge'
     let toolPick = new Set();
     function toolCan(it) {
-      if (E.isEquipped(it.id) || it.protected) return false;
+      if (E.isKept(it.id) || it.protected) return false;
       if (toolMode === 'merge') {
         if (it.ruined || it.grade >= GR.length - 1) return false;
         const first = toolPick.size ? E.item([...toolPick][0]) : null;
@@ -2112,7 +2112,8 @@
           renderPanel();
         });
       } else if (t.dataset.corp) {
-        const p = UI_CFG.corpProducts.find((x) => x.id === t.dataset.corp);
+        const p0 = UI_CFG.corpProducts.find((x) => x.id === t.dataset.corp);
+        const p = p0 && p0.monthly ? { ...p0, corp: G.Meta.PASS.monthlyCorp, krw: G.Meta.PASS.monthlyKrw } : p0;
         if (!p || busy) return;
         askConfirm(p.monthly ? '월정액을 살까요?' : '법카를 살까요?', `${p.monthly ? `법카 <b class="gold">${fmt(p.corp)}</b> + ${G.Meta.PASS.monthlyDays}일 매일 성과급 ${fmt(G.Meta.PASS.monthlyDaily)}` : `법카 <b class="gold">${fmt(p.corp)}</b>`} · ₩${p.krw.toLocaleString('ko-KR')}<br><span class="small">테스트 결제 (실제 결제 없음)</span>`, '구매', () => {
           busy = true;

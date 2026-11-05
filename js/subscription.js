@@ -15,6 +15,8 @@
       if (server) return server.until !== null && server.until > Date.now();
       try { return globalThis.localStorage && localStorage.getItem(KEY) === '1'; } catch (e) { return false; }
     },
+    // 서버 없는 테스트판: 기기에만 30일 (출석 보상 확인용)
+    setMonthlyForTest(days) { monthly = { until: Math.max(monthly && monthly.until > Date.now() ? monthly.until : Date.now(), Date.now()) + days * 86400000 }; },
     setMonthly(m) { monthly = m && typeof m === 'object' && typeof m.until === 'number' ? { until: m.until } : null; },
     monthlyUntil() { return monthly && monthly.until > Date.now() ? monthly.until : null; },
     setActiveForTest(on) {

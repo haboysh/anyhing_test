@@ -101,6 +101,11 @@
     if (out && owned(pet, out)) { const s = summonStats(out, bestTier(pet, out)); for (const k of Object.keys(s)) add(k, s[k]); }
     return res;
   }
+  // 책상 효과만 (보유 효과 공격력은 엔진이 따로 곱함: E.petHoldMult)
+  function deskBonus(pet, out, maxStage = Infinity) {
+    if (!isOpen(maxStage) || !out || !owned(pet, out)) return {};
+    return { ...summonStats(out, bestTier(pet, out)) };
+  }
   const holdTotal = (pet) => KEYS.reduce((s, k) => s + holdPct(k, bestTier(pet, k)), 0);
 
   // 한 반려 화면 정보
@@ -240,7 +245,7 @@
 
   G.Pets = {
     LIST, BY_KEY, KEYS, TIERS, STAT_NAME, CFG, CODEX_KEYS, codexKey,
-    fresh, clean, isOpen, countsOf, owned, bestTier, mergeCost, summonStats, holdPct, holdTotal, bonus, info, list,
+    fresh, clean, isOpen, countsOf, owned, bestTier, mergeCost, summonStats, holdPct, holdTotal, bonus, deskBonus, info, list,
     pickKey, pickTier, gain, start, pullOne, merge, mergeAll,
   };
 })(globalThis.Game = globalThis.Game || {});

@@ -99,9 +99,7 @@
       const add = (b) => { for (const k of Object.keys(b)) if (I.STATS[k]) out[k] = { pct: ((out[k] && out[k].pct) || 0) + b[k], flat: (out[k] && out[k].flat) || 0 }; };
       add(G.Net.bonus(E.S.net, E.S.dept.conquered));
       // 반려는 책상에 올린 효과만 여기 (보유 효과 공격력은 따로 곱함: E.petHoldMult)
-      const pb = { ...E.petBonus() };
-      if (pb.atk) pb.atk -= E.petHoldPct();
-      add(pb);
+      add(G.Pets.deskBonus(E.S.pet, E.S.pet.out, E.S.maxStage));
       return out;
     };
     E.petBonus = () => G.Pets.bonus(E.S.pet, E.S.pet.out, E.S.maxStage);
@@ -1097,7 +1095,7 @@
     };
 
     // 장비 프리셋 바꾸기: 지금 장착 ↔ 교체용 (없어진 장비·흔적 칸은 비움)
-    E.isKept = (id) => E.isEquipped(id) || I.SLOT_KEYS.some((slot) => E.S.presetAlt[slot] === id);
+    E.isKept = (id) => Inv.isEquipped(E.S, id); // 지금 장착 + 교체용 프리셋 (규칙은 inventory.js 한 곳)
     E.presetSwap = function () {
       const next = {};
       let missing = 0;
