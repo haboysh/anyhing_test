@@ -69,6 +69,11 @@
     let petBusy = false;
     let bagMode = 'view'; // 가방: view(상세 보기) | merge(골라서 합성) | dis(골라서 분해) | sell(판매소에 올리기)
     let bagFilter = 'all'; // all | equip | accessory | 부위 키
+    // 가방은 한 번에 BAG_PAGE칸만 그림 (600칸을 다 그리면 느린 폰에서 탭 열 때 1초 넘게 멈춤)
+    const BAG_PAGE = 120;
+    let bagShow = BAG_PAGE;
+    let toolShow = BAG_PAGE;
+    const moreBtn = (left, act) => (left > 0 ? `<button class="bag-more" data-act="${act}">더 보기 <small>${left}개 더</small></button>` : '');
     let bagPick = new Set();
     let lastBagFull = -Infinity;
     let offlineLost = 0;
@@ -741,7 +746,7 @@
             <button data-sort="${bagSort === 'grade' ? 'new' : 'grade'}">${bagSort === 'grade' ? '등급순' : '최신순'}</button></div>
         </div>
         ${items.length
-          ? `<div class="bag-grid">${items.map((it) => `<button class="bag-cell ${bagPick.has(it.id) ? 'picked' : ''} ${bagMode !== 'view' && !canPick(it) ? 'dim' : ''}" data-item="${it.id}">${itemIcon(it)}${!E.isEquipped(it.id) && E.isUpgrade(it) ? '<i class="up">▲</i>' : ''}</button>`).join('')}</div>`
+          ? `<div class="bag-grid">${items.slice(0, bagShow).map((it) => `<button class="bag-cell ${bagPick.has(it.id) ? 'picked' : ''} ${bagMode !== 'view' && !canPick(it) ? 'dim' : ''}" data-item="${it.id}">${itemIcon(it)}${!E.isEquipped(it.id) && E.isUpgrade(it) ? '<i class="up">▲</i>' : ''}</button>`).join('')}</div>${moreBtn(items.length - bagShow, 'bag-more')}`
           : '<div class="empty-note">아직 장비가 없어요.<br>업무를 처리하면 가끔 장비가 나오고, 보스는 꼭 하나 줘요.</div>'}
         <div class="bag-dock">
           <button data-act="rec-equip">추천 장착</button>
@@ -868,6 +873,7 @@
     }
     function showTool(mode) {
       toolMode = mode;
+      toolShow = BAG_PAGE;
       toolPick = new Set();
       renderTool();
     }
@@ -897,7 +903,7 @@
       $('layer-box').innerHTML = `<div class="layer-head"><div class="it-name">${toolMode === 'merge' ? '합성' : '분해'}</div>
           <button class="sheet-x" data-tool="close" aria-label="닫기">✕</button></div>
         <div class="small">장착·보호 중인 건 빼고 보여요</div>
-        <div class="tool-grid">${items.length ? `<div class="bag-grid">${items.map((it) => `<button class="bag-cell ${toolPick.has(it.id) ? 'picked' : ''}" data-tpick="${it.id}">${itemIcon(it)}</button>`).join('')}</div>`
+        <div class="tool-grid">${items.length ? `<div class="bag-grid">${items.slice(0, toolShow).map((it) => `<button class="bag-cell ${toolPick.has(it.id) ? 'picked' : ''}" data-tpick="${it.id}">${itemIcon(it)}</button>`).join('')}</div>${moreBtn(items.length - toolShow, 'tool-more')}`
           : '<div class="empty-note">고를 수 있는 아이템이 없어요</div>'}</div>
         <div class="stat-line">${info}</div>
         <div class="act-row">${btns}</div>`;
@@ -910,6 +916,15 @@
         else if (toolMode === 'merge' && toolPick.size >= I.MERGE.count) { toast(`${I.MERGE.count}개까지 골라요`); return; }
         else toolPick.add(id);
         renderTool();
+        return;
+      }
+      if (t.dataset.act === 'tool-more') {
+        const box = t.closest('.tool-grid');
+        const y = box ? box.scrollTop : 0;
+        toolShow += BAG_PAGE;
+        renderTool();
+        const nb = $('layer-box').querySelector('.tool-grid');
+        if (nb) nb.scrollTop = y;
         return;
       }
       const a = t.dataset.tool;
@@ -2093,13 +2108,14 @@
         const id = E.S.equipped[t.dataset.slot];
         if (id === null || id === undefined) toast('가방에서 아이템을 눌러 장착하세요');
         else openDetail(id);
-      } else if (t.dataset.sort) { bagSort = t.dataset.sort; renderPanel(); }
+      } else if (t.dataset.sort) { bagSort = t.dataset.sort; bagShow = BAG_PAGE; renderPanel(); }
       else if (t.dataset.filter) {
         if (t.dataset.filter === 'slot') {
           const keys = I.SLOT_KEYS;
           const i = keys.indexOf(bagFilter);
           bagFilter = i < 0 ? keys[0] : i === keys.length - 1 ? 'all' : keys[i + 1];
         } else bagFilter = t.dataset.filter;
+        bagShow = BAG_PAGE;
         renderPanel();
       }
       else if (t.dataset.pull) {
@@ -2142,7 +2158,8 @@
           recentNew.clear();
           renderPanel();
         });
-      } else if (a === 'codex') showCodex();
+      } else if (a === 'bag-more') { bagShow += BAG_PAGE; renderPanel(); }
+      else if (a === 'codex') showCodex();
       else if (a === 'sets') showSets();
       else if (a === 'bulk') showBulk();
       else if (a === 'auto') {
