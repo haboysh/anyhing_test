@@ -49,6 +49,7 @@
     let choice = null; // 열려 있는 선택 팝업 (다른 팝업에 가려지면 닫힌 뒤 다시 띄움)
     let deferred = null;
     let busy = false; // 서버 요청 중 (버튼 연타 방지)
+    let pullingN = 0; // 지금 서버 답을 기다리는 뽑기 버튼 (n회)
     const Y = hooks.sync;
     let GU = null; // 사내 게시판·튜토리얼 화면 (ui-guide.js)
     let lastBuffs = '';
@@ -1413,7 +1414,7 @@
         <div class="gacha-box">
           <div class="seg seg4">${KINDS.map(([k, n]) => `<button data-act="gk-${k}" class="${gachaKind === k ? 'active' : ''}">${n}</button>`).join('')}</div>
           <div class="gacha-sub">${skillLocked ? `최고 ${gachaKind === 'pet' ? G.Pets.CFG.unlock : G.Skills.CFG.unlock}층에서 열려요` : sub}<button class="rate-link" data-rates="gacha_${gachaKind}">확률</button></div>
-          <div class="pull-row">${prices.map((n) => `<button class="buy pull-btn" data-pull="${n}" ${skillLocked ? 'disabled' : ''}><span>${n}회</span><b>성과급&nbsp;${fmt(C.PRICES[n])}</b></button>`).join('')}</div>
+          <div class="pull-row">${prices.map((n) => `<button class="buy pull-btn${pullingN === n ? ' pulling' : ''}" data-pull="${n}" ${skillLocked || pullingN ? 'disabled' : ''}><span>${n}회</span><b>성과급&nbsp;${fmt(C.PRICES[n])}</b></button>`).join('')}</div>
           <div class="g-prog">
             <span>Lv.<b>${st.level}</b>/${st.maxLevel}</span>
             <div class="bar thin"><div class="lv-fill" style="width:${lvPct}%"></div></div>
@@ -2121,8 +2122,11 @@
       else if (t.dataset.pull) {
         if (busy) return;
         busy = true;
-        Y.pull(Number(t.dataset.pull), gachaKind).then((r) => {
+        pullingN = Number(t.dataset.pull);
+        t.classList.add('pulling'); // 서버 답을 기다리는 동안 바로 눌린 티
+        Y.pull(pullingN, gachaKind).then((r) => {
           busy = false;
+          pullingN = 0;
           if (!r.ok) toast(r.reason);
           else showGachaResult(r.results);
           renderPanel();

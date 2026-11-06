@@ -52,7 +52,7 @@
       name: '타자 속도', desc: '초당 처리 횟수', max: 500,
       value: (l) => 1 + 0.006 * l,
       cost: (l) => 30 * Math.pow(1.027, l),
-      fmt: (v) => v.toFixed(2) + '/초',
+      fmt: (v) => v.toFixed(3) + '/초', // 레벨당 +0.006이라 셋째 자리까지 (둘째 자리면 어떤 레벨은 안 변해 보임)
     },
     crit: {
       name: '눈치', desc: `치명타 확률 (${F.CRIT_MULT}배)`, max: 500,

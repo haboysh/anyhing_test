@@ -102,9 +102,9 @@
     async function settle(action) {
       if (SPEND.has(action) && Y.pendingKills() > 0) await Y.flushKills();
     }
-    function invAction(action, args, after) {
+    function invAction(action, args, after, noSettle = false) {
       if (!invReady) return notReady();
-      return settle(action).then(() => serial(() => guard(async () => {
+      return (noSettle ? Promise.resolve() : settle(action)).then(() => serial(() => guard(async () => {
         const r = await cloud.inv({ action, ...invBody(args) });
         applyR(r);
         const ret = E.localize(r.ret || { ok: true });
@@ -138,7 +138,11 @@
       if (cost === null) return local({ ok: false, reason: '없는 뽑기 횟수예요' });
       if (kind !== 'skill' && kind !== 'pet' && E.bagFree() < n) return local({ ok: false, reason: `가방 공간이 부족해요 (${n}칸 필요)` });
       if (E.S.bonus < cost) return local({ ok: false, reason: '성과급이 부족해요' });
-      return invAction('gacha', { n, kind, floor: E.gachaFloor() }, (ret) => { if (ret.ok) E.gachaStats(ret.results, ret.cost); });
+      // 재산을 안 쓰는 뽑기는 쌓인 처치 기록을 먼저 보내지 않음 (서버 왕복 1번 줄임).
+      // 스킬: 재산·가방 안 씀. 장비·장신구: 자동 감정이 꺼져 있고 가방이 넉넉할 때만 (처치 드롭과 순서가 바뀌어도 가방이 안 넘치게).
+      // 반려는 해금 층(서버 최고 층)이 걸려 있어 그대로 먼저 보냄
+      const quick = kind === 'skill' || (kind !== 'pet' && !E.S.autoAppraise && E.bagFree() - n >= 20);
+      return invAction('gacha', { n, kind, floor: E.gachaFloor() }, (ret) => { if (ret.ok) E.gachaStats(ret.results, ret.cost); }, quick);
     };
 
     // ----- 부서 장악 묶음: 승리·받기·한 번에 처리·소탕·출입증 구매는 서버가 판정 (규칙은 depts.js) -----

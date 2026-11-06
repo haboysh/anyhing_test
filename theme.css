@@ -263,6 +263,10 @@ button:focus-visible, .cur:focus-visible { outline: 3px solid var(--hilite); out
 .pull-row { gap: 6px; }
 .pull-btn { min-width: 0; padding: 6px 2px; }
 .pull-btn span { font-size: 12px; color: var(--ink); }
+.pull-btn.pulling { opacity: 1; transform: translateY(2px); filter: brightness(.92); }
+.pull-btn.pulling b { visibility: hidden; position: relative; }
+.pull-btn.pulling b::after { content: '뽑는 중…'; visibility: visible; position: absolute; inset: 0; text-align: center; animation: pull-wait .8s ease-in-out infinite; }
+@keyframes pull-wait { 50% { opacity: .35; } }
 .pull-btn b { font-size: 11px; white-space: nowrap; }
 .g-prog { display: grid; grid-template-columns: auto 1fr auto auto; align-items: center; gap: 8px; margin-top: 8px; font-size: 11px; color: var(--ink-sub); }
 .g-prog .bar.thin { margin: 0; }
