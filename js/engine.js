@@ -261,6 +261,8 @@
     E.upcoming = () => (E.mode === "tower" || E.side || (E.enemy && E.enemy.boss) ? [] : E.line.slice(0, 2));
     function spawn() {
       E.enemyHitT = 0;
+      // 남은 공격 시간은 한 번 치기 분량까지만 넘김 (느린 화면·2배속에서 처치 후 남은 시간이 계속 쌓여 새 적을 한꺼번에 때리던 것)
+      E.attackTimer = Math.min(E.attackTimer, 1 / E.aps());
       if (E.mode === 'tower') return spawnTower();
       if (E.side) return spawnSide();
       const s = E.S.stage;

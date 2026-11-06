@@ -25,7 +25,10 @@
   // 업무 스킬 뽑기: 장신구 표에서 신화만 0.049%(Lv0) → 0.081%(Lv10), 차이는 일반에서 (명세 ③ 15절)
   const SKILL = { ...CONFIG, RATES_LV0: [59.300, 29.667, 9.889, 0.988, 0.108, 0.049], RATES_MAX: [16.176, 16.228, 48.685, 17.851, 0.989, 0.081] };
   // 반려 뽑기: 장신구 표 그대로 (명세 ④ 28절). 뽑기 레벨 보너스(업무력)는 안 줌 (35절 #10)
-  const BY_KIND = { acc: CONFIG, equip: CONFIG, skill: SKILL, pet: CONFIG };
+  // 장비·장신구 뽑기: 30일쯤 처치 드롭(200층대)보다 못해서 성과급을 써도 거의 안 세지던 것 → 영웅 이상을 올림 (2026-11-06 봇 군집 점검, 1안)
+  // 무과금 30일 층은 그대로, 소·중·고과금 +3~7% (docs/balance-check-2026-11-06.md 3차)
+  const EQUIP = { ...CONFIG, RATES_LV0: [50, 32, 14, 3, 0.9, 0.1], RATES_MAX: [12, 20, 45, 19, 3.6, 0.4] };
+  const BY_KIND = { acc: EQUIP, equip: EQUIP, skill: SKILL, pet: CONFIG };
   const configFor = (kind) => BY_KIND[kind] || CONFIG;
 
   const sum = (a) => a.reduce((x, y) => x + y, 0);

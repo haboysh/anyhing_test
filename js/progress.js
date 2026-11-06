@@ -33,7 +33,8 @@
     seenRuns: 6, // 기억하는 회차 표시 수 (옛 회차 처치는 거절)
     recentReqs: 8, // 같은 묶음 재전송 확인용 최근 요청 ID
     probation: { floors: 10, burnouts: 5 }, // 수습 (engine PROBATION과 같음, 테스트가 확인)
-    burnRest: F.REST_MIN, // 번아웃 보고 상한: 서버 시간 ÷ 최소 휴식(초) + 1
+    burnRest: F.REST_MIN,
+    rebossMax: 3, // 최고 층 아래 보스 다시 잡기 허용 (번아웃으로 내려왔을 때만, 번아웃마다 1번, 최대 몇 번 모아 둠) // 번아웃 보고 상한: 서버 시간 ÷ 최소 휴식(초) + 1
     maxGold: 1e300,
     skillBucketSec: 180, // 아아·야근 사용 보고 통 = 1번 + 3분 치 (쿨타임마다 1번)
     skillSlack: 0.05, // 통이 이만큼 모자라도 1번 인정 (폰이 쿨타임 끝나자마자 쓰면 서버 시계로 몇백 ms 빠름 — 봇 seed 3)
@@ -105,6 +106,7 @@
       last: pos(r.last, 1), gold: v1 ? 0 : Math.min(CFG.maxGold, num(r.gold)),
       lv: v1 ? cleanLv(kit && kit.lv, P.max) : cleanLv(r.lv, P.max), kit,
       pb: { n: isInt(pb.n) && pb.n >= 0 ? Math.min(pb.n, 99) : 0, f: pb.f === true }, nw: r.nw === 1 ? 1 : 0,
+      rb: isInt(r.rb) && r.rb > 0 ? Math.min(r.rb, CFG.rebossMax) : 0,
     };
     const co = G.Career.company(P.run.co);
     P.run.o = G.Career.offsetOf(co ? co.grade : 0);
@@ -513,6 +515,15 @@
       const boss = k.b === 1 || k.b === true;
       if (!isInt(f) || f < 1 + P.run.o || f > P.run.top) { rej('floor', n0); return 0; }
       if (boss !== isBoss(f)) { rej('boss', n0); return 0; }
+      // 최고 층 아래 보스: 정상 폰은 보스를 잡으면 다음 층으로 가고 층을 고를 수 없음 → 번아웃 후퇴로 다시 만난 만큼만 인정
+      // (조작 앱이 낮은 보스를 반복해 확정 드롭을 받던 것 막기, 2026-11-06 봇 군집 점검)
+      if (boss && f < P.run.top) {
+        const ok = Math.min(n0, P.run.rb | 0);
+        if (ok < n0) rej('reboss', n0 - ok);
+        if (!ok) return 0;
+        P.run.rb -= ok;
+        n0 = ok;
+      }
       let n = 0;
       for (; n < n0; n++) {
         const s = stats();
@@ -641,7 +652,11 @@
       rej('burn', n0 - n);
       stat('burnout', n);
       // 폰은 번아웃하면 그 층 처치 수를 0으로 되돌림 (후퇴 안 해도) → 서버도 맨 위 층 진행을 0으로 (서버가 폰보다 한 층 앞서가지 않게)
-      if (n > 0) P.run.prog = 0;
+      if (n > 0) {
+        P.run.prog = 0;
+        // 보스 다음 층에서 번아웃 → 보스 층으로 후퇴하면 그 보스를 한 번 더 만남 (engine advance는 보스 처치 후 항상 다음 층)
+        P.run.rb = Math.min(CFG.rebossMax, (P.run.rb | 0) + n);
+      }
       const pb = P.run.pb;
       if (P.pres > 0 && !pb.f && P.run.top < P.run.start + CFG.probation.floors) {
         pb.n = Math.min(99, pb.n + n);
@@ -761,7 +776,7 @@
     P.ap = G.State.cleanApply(S.apply);
     P.run.pb = { n: S.probation.burnouts | 0, f: S.probation.failed === true };
     if (newRun) {
-      // 새 회차: 서버가 회차 표시를 만들고 회사·시작 층(직급 시작과 낙하산 중 큰 쪽 + 회사 보정)을 정함. 재산 0원·근로 강화 처음부터. 평생 최고 층은 깨야 오름
+      // 새 회차: 서버가 회차 표시를 만들고 회사·시작 층(직급 시작과 낙하산 중 큰 쪽 + 회사 보정)을 정함. 재산 0원·근로 강화 처음부터
       const co = G.Career.company(S.company.id);
       const o = G.Career.offsetOf(co ? co.grade : 0);
       let id = newRunId(rng);
@@ -769,6 +784,8 @@
       const kit = P.run.kit;
       P.seen = [...P.seen, id].slice(-CFG.seenRuns);
       P.run = { ...runFresh(), id, co: co ? co.id : null, o, start: S.stage + o, top: S.stage + o, last: S.stage + o, kit, nw: 1 };
+      // 시작 층(서버가 정함)이 평생 최고 층보다 높으면 최고 층도 거기까지 (폰 engine prestige와 같게 — 다르면 해금·뽑기 층이 폰보다 낮던 것, 2026-11-06)
+      P.max = Math.max(P.max, P.run.start);
     }
     return { ret: { ...ret, c: careerView(P), progress: view(P) }, bonus: ret.bonus || 0, cost: ret.cost || 0 };
   }
