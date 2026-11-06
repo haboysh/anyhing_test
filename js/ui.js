@@ -234,10 +234,10 @@
       check: '<svg class="ic" viewBox="0 0 12 12" aria-hidden="true"><path d="M1.8 6.4 4.7 9.2 10.4 2.8" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="square"/></svg>',
     };
 
-    function showModal(title, html) {
+    function showModal(title, html, keepScroll = false) {
       if (choice) { deferred = choice; choice = null; }
-      // 다른 창이 열리면 본문 스크롤을 맨 위로 (같은 창 다시 그리기는 위치 유지)
-      const fresh = title !== $('modal-title').textContent || !$('modal').classList.contains('show');
+      // 다른 창이 열리면 본문 스크롤을 맨 위로 (같은 창 다시 그리기는 위치 유지, 제목 숫자가 바뀌는 창은 keepScroll)
+      const fresh = !$('modal').classList.contains('show') || (!keepScroll && title !== $('modal-title').textContent);
       $('modal-title').textContent = title;
       $('modal-body').innerHTML = html;
       $('modal-ok').textContent = '확인';
@@ -1601,20 +1601,44 @@
     }
 
     // ----- 업적 -----
-    function showAchievements() {
+    let achBusy = false; // 업적 받기 중 (모두 받기 연타 방지)
+    function showAchievements(keep = false) {
       const list = E.achievements();
       const done = list.filter((a) => a.claimed).length;
+      const ready = list.filter((a) => a.ready && !a.claimed);
       const rows = list.map((a) => checkRow({ attr: `data-ac="${a.id}"`, name: a.name, desc: `${a.kind} · ${a.cond}`, claimed: a.claimed, ready: a.ready,
         prog: a.prog, need: a.need, reward: `성과급 ${a.bonus}개` })).join('');
-      showModal(`업적 ${done}/${list.length}`, `<div class="pick-list chk-list">${rows}</div>`);
+      const allBtn = ready.length ? `<div class="act-row ach-all"><button class="act-btn gold-btn" data-ac-all ${achBusy ? 'disabled' : ''}>${achBusy ? '받는 중…' : `모두 받기 <small>${ready.length}개 · 성과급 ${fmt(ready.reduce((n, a) => n + a.bonus, 0))}</small>`}</button></div>` : '';
+      showModal(`업적 ${done}/${list.length}`, `${allBtn}<div class="pick-list chk-list">${rows}</div>`, keep);
       $('modal').classList.add('wide');
       $('modal-ok').textContent = '닫기';
     }
     $('modal-body').addEventListener('click', (e) => {
+      const all = e.target.closest('button[data-ac-all]');
+      if (all && !all.disabled && !achBusy) { claimAllAchievements(); return; }
       const t = e.target.closest('button[data-ac]');
-      if (!t || t.disabled) return;
-      Y.claimAchievement(t.dataset.ac).then((r) => { toast(r.ok ? `성과급 +${r.bonus}개` : r.reason); showAchievements(); renderHud(); });
+      if (!t || t.disabled || achBusy) return;
+      Y.claimAchievement(t.dataset.ac).then((r) => { toast(r.ok ? `성과급 +${r.bonus}개` : r.reason); showAchievements(true); renderHud(); });
     });
+
+    // 받을 수 있는 업적을 하나씩 차례로 받음 (서버 요청 횟수 제한에 안 걸리게 동시에 보내지 않음)
+    async function claimAllAchievements() {
+      achBusy = true;
+      showAchievements(true);
+      let got = 0;
+      let n = 0;
+      let fail = null;
+      for (const a of E.achievements().filter((x) => x.ready && !x.claimed)) {
+        const r = await Y.claimAchievement(a.id);
+        if (!r.ok) { fail = r.reason; break; }
+        got += r.bonus;
+        n++;
+      }
+      achBusy = false;
+      toast(n ? `업적 ${n}개 · 성과급 +${fmt(got)}개${fail ? ` (멈춤: ${fail})` : ''}` : fail || '받을 업적이 없어요');
+      if ($('modal').classList.contains('show') && $('modal-title').textContent.startsWith('업적')) showAchievements(true);
+      renderHud();
+    }
 
     // ----- 미션 -----
     function showMissions() {

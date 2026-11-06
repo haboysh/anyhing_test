@@ -316,6 +316,9 @@ button:active { transform: translateY(2px) scale(.98); }
 .act-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin: 10px 0 4px; }
 .act-grid .act-btn:last-child:nth-child(odd) { grid-column: span 2; }
 .act-row { display: flex; gap: 8px; margin-top: 8px; }
+.ach-all { position: sticky; top: 0; z-index: 2; margin: 0 0 8px; }
+.ach-all .act-btn { width: 100%; min-height: 44px; }
+.ach-all small { margin-left: 4px; font-weight: 700; }
 .act-row .act-btn { flex: 1; }
 .act-btn { padding: 11px 8px; border-radius: 14px; font-size: 14px; font-weight: 900; background: rgba(255, 255, 255, .09); border: 1px solid var(--card-line);
   display: flex; flex-direction: column; align-items: center; gap: 2px; }
