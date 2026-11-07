@@ -28,11 +28,12 @@
     rankCost: (rank) => 500 * (rank + 1), // 다음 사이 성과급 ✅ 2026-10-28 사용자 확정 — 합계 27,500/명
     rankPct: 2, // 사이 1단계마다 같은 능력치 +2% [임시 ⚖]
     bulkMax: 1000, // 한 번에 올릴 수 있는 최대 레벨 (요청 크기 제한)
+    cardShop: { perDay: 20, cost: 50 }, // 명함 상점: 성과급 50 = 명함 1장, 하루 20장 (2026-11-07 사용자 — 인맥이 명함에 막혀 성과급을 더 써도 못 키우던 것)
   };
   // 사이 r일 때 친분 상한 (사이 9 → 100, 사이 10 = 다 키움)
   const lvCap = (rank) => Math.min(CFG.maxLv, rank * CFG.lvPerRank + CFG.lvPerRank);
 
-  const fresh = () => ({ lv: {}, rank: {} });
+  const fresh = () => ({ lv: {}, rank: {}, shop: { day: null, n: 0 } });
   const obj = (v) => (v && typeof v === 'object' && !Array.isArray(v) ? v : {});
   const toInt = (v) => (Number.isInteger(v) && v >= 0 ? v : 0);
   // 세이브·서버 값 정리 (모르는 키 제거, 정수·범위)
@@ -45,6 +46,8 @@
       if (rank) d.rank[id] = rank;
       if (lv) d.lv[id] = lv;
     }
+    const sh = obj(r.shop);
+    d.shop = { day: Number.isInteger(sh.day) ? sh.day : null, n: Math.min(CFG.cardShop.perDay, toInt(sh.n)) };
     return d;
   }
 
@@ -158,5 +161,28 @@
     return ok({ n: total, cost, ups });
   }
 
-  G.Net = { PEOPLE, BY_ID, IDS, RANKS, CFG, lvCap, fresh, clean, isOpen, openCount, info, list, bonus, levelUp, rankUp, levelAll };
+  // ----- 명함 상점: 성과급으로 명함 (하루 상한, 한국 날짜 기준) -----
+  function cardShopLeft(st, now) {
+    const shop = st.net.shop || (st.net.shop = { day: null, n: 0 });
+    const d = G.Meta.dayNum(now);
+    if (shop.day !== d) { shop.day = d; shop.n = 0; }
+    return CFG.cardShop.perDay - shop.n;
+  }
+  function buyCards(st, h0, n = 1) {
+    const h = G.Inv.hooks(h0);
+    if (!isOpen(IDS[0], conqueredOf(st))) return no('첫 부서 장악 때 열려요');
+    if (!Number.isInteger(n) || n < 1) return no('장 수가 올바르지 않아요');
+    const left = cardShopLeft(st, h.now());
+    if (left <= 0) return no('오늘은 다 샀어요');
+    const k = Math.min(n, left, Math.floor(st.bonus / CFG.cardShop.cost));
+    if (k < 1) return no('성과급이 부족해요');
+    const cost = k * CFG.cardShop.cost;
+    st.bonus -= cost;
+    st.namecard += k;
+    st.net.shop.n += k;
+    h.emit('save');
+    return ok({ n: k, cost, left: left - k });
+  }
+
+  G.Net = { PEOPLE, BY_ID, IDS, RANKS, CFG, lvCap, fresh, clean, isOpen, openCount, info, list, bonus, levelUp, rankUp, levelAll, cardShopLeft, buyCards };
 })(globalThis.Game = globalThis.Game || {});

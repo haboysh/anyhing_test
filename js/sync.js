@@ -176,6 +176,7 @@
     Y.netLevelUp = (id, n = 1) => (online ? netAction('levelUp', { id, n }) : local(E.netLevelUp(id, n)));
     Y.netRankUp = (id) => (online ? netAction('rankUp', { id }) : local(E.netRankUp(id)));
     Y.netLevelAll = () => (online ? netAction('levelAll', {}) : local(E.netLevelAll()));
+    Y.netBuyCards = (n) => (online ? netAction('buyCards', { n }) : local(E.netBuyCards(n)));
     // ----- 책상 반려: 뽑기(위 Y.pull kind 'pet')·합치기·해금 지급은 서버가 판정 (규칙은 pets.js). 책상에 올리기는 폰 -----
     if (online) E.serverPets = true;
     function petAction(action, args) {

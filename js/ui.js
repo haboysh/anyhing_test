@@ -1810,6 +1810,15 @@
         <div class="nc-eff"><span>${NET_STAT[p.stat]} <b>+${n2(p.pct)}%</b></span><small>친분 1마다 +${p.per}% · 사이 1마다 +${NT.CFG.rankPct}%</small></div>
         ${act}</div>`;
     }
+    // 명함 상점: 성과급 → 명함 (하루 상한)
+    function cardShopRow(lock) {
+      const C = NT.CFG.cardShop;
+      const left = E.netCardLeft();
+      const can = Math.min(left, Math.floor(E.S.bonus / C.cost));
+      return `<div class="nc-shop"><span>명함 상점 <small>1장 성과급 ${C.cost} · 오늘 ${left}/${C.perDay}장 남음</small></span>
+        <div class="act-row"><button class="act-btn" data-nt="card" data-n="1" ${lock || can < 1 ? 'disabled' : ''}>1장 · 성과급 ${C.cost}</button>
+        <button class="act-btn" data-nt="card" data-n="${Math.max(1, can)}" ${lock || can < 2 ? 'disabled' : ''}>${Math.max(2, can)}장 · 성과급 ${fmt(Math.max(2, can) * C.cost)}</button></div></div>`;
+    }
     function showNet() {
       const info = E.netInfo();
       if (!info.open) { toast('첫 부서 장악(30층 장악전) 때 열려요'); return; }
@@ -1821,7 +1830,8 @@
           <div class="nc-sum"><small>인맥 효과 합계</small><b>${sum}</b></div></div>
         <div class="nc-list">${info.list.map((p) => netCard(p, lock)).join('')}</div>
         <button class="act-btn gold-btn wide nc-all" data-nt="all" ${anyLv && !lock ? '' : 'disabled'}>일괄 친분 올리기 · 낮은 레벨부터 고르게</button>
-        <div class="small">친분 10레벨마다 사이를 올려야 더 오를 수 있어요 (성과급). 명함은 외부 미팅·기획팀 생산에서 얻어요</div>`);
+        ${cardShopRow(lock)}
+        <div class="small">친분 10레벨마다 사이를 올려야 더 오를 수 있어요 (성과급). 명함은 외부 미팅·기획팀 생산·명함 상점에서 얻어요</div>`);
       $('modal').classList.add('wide');
       $('modal-ok').textContent = '닫기';
     }
@@ -1837,6 +1847,7 @@
       if (a === 'lv') Y.netLevelUp(id, Number(t.dataset.n)).then(done((r) => `${name} 친분 Lv${r.lv} · 명함 −${fmt(r.cost)}장`));
       else if (a === 'rank') Y.netRankUp(id).then(done((r) => `${name}와(과) ${r.rankName}! · 성과급 −${fmt(r.cost)}개`));
       else if (a === 'all') Y.netLevelAll().then(done((r) => `친분 +${r.n} · 명함 −${fmt(r.cost)}장`));
+      else if (a === 'card') Y.netBuyCards(Number(t.dataset.n)).then(done((r) => `명함 +${r.n}장 · 성과급 −${fmt(r.cost)}개`));
       else netBusy = false;
     });
 

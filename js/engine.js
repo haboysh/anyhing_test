@@ -93,11 +93,11 @@
       }
       return out;
     };
-    // 도감 + 인맥 + 반려 (장비 %와 같은 칸, 상한 규칙 그대로 — 명세 m4 19·27절). 반려 'rest'(휴식 감소)는 restTime이 따로 씀
+    // 도감 + 책상 반려 (장비 %와 같은 칸, 상한 규칙 그대로 — 명세 m4 19·27절). 반려 'rest'(휴식 감소)는 restTime이 따로 씀
+    // 인맥은 따로 곱함 (E.netMult — 2026-11-07: 장비 % 칸에 더하면 사이를 올려도 거의 안 세져서)
     E.extraBonuses = function () {
       const out = Eq.codexBonus(E.S.codex);
       const add = (b) => { for (const k of Object.keys(b)) if (I.STATS[k]) out[k] = { pct: ((out[k] && out[k].pct) || 0) + b[k], flat: (out[k] && out[k].flat) || 0 }; };
-      add(G.Net.bonus(E.S.net, E.S.dept.conquered));
       // 반려는 책상에 올린 효과만 여기 (보유 효과 공격력은 따로 곱함: E.petHoldMult)
       add(G.Pets.deskBonus(E.S.pet, E.S.pet.out, E.S.maxStage));
       return out;
@@ -107,6 +107,14 @@
     E.petHoldPct = () => (G.Pets.isOpen(E.S.maxStage) ? G.Pets.holdTotal(E.S.pet) : 0);
     E.petHoldMult = () => 1 + E.petHoldPct() / 100;
     E.skillHoldMult = () => 1 + G.Skills.holdAtkPct(E.S.skills) / 100;
+    // 인맥: 업무력·체력·보스 데미지·재산 각각 따로 곱함 (열린 인맥만)
+    let netCache = null;
+    let netKey = '';
+    E.netMult = (stat) => {
+      const key = JSON.stringify(E.S.net) + E.S.dept.conquered;
+      if (key !== netKey) { netKey = key; netCache = G.Net.bonus(E.S.net, E.S.dept.conquered); }
+      return 1 + (netCache[stat] || 0) / 100;
+    };
     E.petRestCut = () => Math.min(0.9, (E.petBonus().rest || 0) / 100);
     E.bonuses = function () {
       if (!bonusCache || bonusFor !== E.S) {
@@ -130,22 +138,22 @@
     // 스킬 없이 (방치 보상·전투력 계산용)
     // 뽑기 레벨 보너스: 장비·장신구 뽑기 레벨마다 최종 업무력 +% (서로 곱함)
     E.gachaAtkMult = () => G.Gacha.CONFIG.LEVEL_KINDS.filter((k) => E.S.gacha[k]).reduce((m, k) => m * (1 + G.Gacha.CONFIG.LEVEL_ATK[G.Gacha.levelFor(E.S.gacha[k].count)] / 100), 1);
-    const atkBase = () => UPGRADES.atk.value(E.S.lv.atk) * PERKS.dmg.value(E.S.perk.dmg) * E.promoMult() * T('atk') * E.gachaAtkMult() * E.petHoldMult() * E.skillHoldMult();
+    const atkBase = () => UPGRADES.atk.value(E.S.lv.atk) * PERKS.dmg.value(E.S.perk.dmg) * E.promoMult() * T('atk') * E.gachaAtkMult() * E.petHoldMult() * E.skillHoldMult() * E.netMult('atk');
     // 업무 스킬 보유 효과도 업무력 %에 더함
     const withAtk = (base) => base * (1 + pct('atk') + tb('atk')) + flat('atk');
     const withAps = (base) => base * (1 + pct('aspd')) * T('aspd');
     E.atkNoSkill = () => withAtk(atkBase());
     // 야근 모드: 장비 깡수치까지 포함한 최종 공격력의 3배
     E.atk = () => E.atkNoSkill() * (E.active.night > 0 ? 3 : 1);
-    E.maxHp = () => UPGRADES.hp.value(E.S.lv.hp) * PERKS.hp.value(E.S.perk.hp) * E.promoMult() * T('hp') *
+    E.maxHp = () => UPGRADES.hp.value(E.S.lv.hp) * PERKS.hp.value(E.S.perk.hp) * E.promoMult() * T('hp') * E.netMult('hp') *
       (1 + pct('hp') + tb('hp')) + flat('hp');
     E.apsNoSkill = () => withAps(UPGRADES.spd.value(E.S.lv.spd));
     E.aps = () => E.apsNoSkill() * (E.active.coffee > 0 ? 2 : 1);
     E.critChance = () => Math.min(capOf('critRate'), UPGRADES.crit.value(E.S.lv.crit) + pct('critRate') + T('critRate'));
     E.critMult = () => F.CRIT_MULT + pct('critDmg') + tb('critDmg') + T('critDmg');
     E.hpRegen = () => F.HP_REGEN * (1 + pct('regen') + tb('regen')) * T('regen');
-    E.bossDmgMult = () => (1 + pct('boss') + tb('boss')) * T('bossDmg');
-    E.goldMult = () => PERKS.gold.value(E.S.perk.gold) * (1 + pct('gold') + tb('gold')) * T('gold');
+    E.bossDmgMult = () => (1 + pct('boss') + tb('boss')) * T('bossDmg') * E.netMult('boss');
+    E.goldMult = () => PERKS.gold.value(E.S.perk.gold) * (1 + pct('gold') + tb('gold')) * T('gold') * E.netMult('gold');
     E.goldFlat = () => flat('gold');
     E.goldPerKill = (f, boss) => F.goldPerKill(f, boss) * E.goldMult() + E.goldFlat();
     E.offlineMult = () => (1 + pct('offline') + tb('offline')) * T('offline');
@@ -192,14 +200,14 @@
           formula: '(10 × 초당 기대 데미지 + 2 × 체력) × (1 + 0.5 × 멘탈 + 0.2 × 꿀잠)',
           parts: [['초당 기대 데미지', 'n', E.dps()], ['체력', 'n', E.maxHp()], ['멘탈', ...P(E.mentalChance())], ['꿀잠', ...P(E.sleepCut())]] },
         '업무력': { desc: '한 번 칠 때 적에게 주는 기본 데미지예요. (공격력)',
-          formula: '근로 강화 × 학벌 × 직급 보너스 × 사풍 × 뽑기 레벨 × 반려 보유 × 스킬 보유 × (1 + 장비·인맥·책상 반려·도감·타워 %) + 장비 깡수치',
+          formula: '근로 강화 × 학벌 × 직급 보너스 × 사풍 × 뽑기 레벨 × 반려 보유 × 스킬 보유 × 인맥 × (1 + 장비·책상 반려·도감·타워 %) + 장비 깡수치',
           parts: [['근로 강화 (Lv.' + E.S.lv.atk + ')', 'n', UPGRADES.atk.value(E.S.lv.atk)], ['학벌 특전', 'x', PERKS.dmg.value(E.S.perk.dmg)], ['직급 보너스', 'x', E.promoMult()],
-            ['사풍', 'x', T('atk')], ['뽑기 레벨', 'x', E.gachaAtkMult()], ['반려 보유 효과', 'x', E.petHoldMult()], ['업무 스킬 보유 효과', 'x', E.skillHoldMult()],
-            ['장비·인맥·책상 반려·도감', '%', pct('atk') * 100], ['야근 타워', '%', tb('atk') * 100], ['장비 깡수치', '+', flat('atk')]], total: E.atkNoSkill(), extra: atkPct },
+            ['사풍', 'x', T('atk')], ['뽑기 레벨', 'x', E.gachaAtkMult()], ['반려 보유 효과', 'x', E.petHoldMult()], ['업무 스킬 보유 효과', 'x', E.skillHoldMult()], ['인맥', 'x', E.netMult('atk')],
+            ['장비·책상 반려·도감', '%', pct('atk') * 100], ['야근 타워', '%', tb('atk') * 100], ['장비 깡수치', '+', flat('atk')]], total: E.atkNoSkill(), extra: atkPct },
         '체력': { desc: '적에게 맞으면 줄어들고, 0이 되면 번아웃(휴식)이에요.',
-          formula: '근로 강화 × 강철 체력 × 직급 보너스 × 사풍 × (1 + 장비·인맥·반려·도감·타워 %) + 장비 깡수치',
+          formula: '근로 강화 × 강철 체력 × 직급 보너스 × 사풍 × 인맥 × (1 + 장비·반려·도감·타워 %) + 장비 깡수치',
           parts: [['근로 강화 (Lv.' + E.S.lv.hp + ')', 'n', UPGRADES.hp.value(E.S.lv.hp)], ['강철 체력 특전', 'x', PERKS.hp.value(E.S.perk.hp)], ['직급 보너스', 'x', E.promoMult()],
-            ['사풍', 'x', T('hp')], ['장비·인맥·반려·도감', '%', pct('hp') * 100], ['야근 타워', '%', tb('hp') * 100], ['장비 깡수치', '+', flat('hp')]], total: E.maxHp(), extra: hpPct },
+            ['사풍', 'x', T('hp')], ['인맥', 'x', E.netMult('hp')], ['장비·반려·도감', '%', pct('hp') * 100], ['야근 타워', '%', tb('hp') * 100], ['장비 깡수치', '+', flat('hp')]], total: E.maxHp(), extra: hpPct },
         '타자 속도': { desc: '1초에 몇 번 치는지예요. 높을수록 빨리 처리해요.', formula: '근로 강화 × (1 + 장비 %) × 사풍',
           parts: [['근로 강화 (Lv.' + E.S.lv.spd + ')', 'n', UPGRADES.spd.value(E.S.lv.spd)], ['장비', '%', pct('aspd') * 100], ['사풍', 'x', T('aspd')]], total: E.apsNoSkill() },
         '치명타 확률': { desc: '한 번 칠 때 치명타가 터질 확률이에요.', formula: `눈치 강화 + 장비 % + 사풍 (최대 ${Math.round(capOf('critRate') * 100)}%)`,
@@ -208,10 +216,10 @@
           parts: [['기본', 'n', F.CRIT_MULT], ['장비·인맥·반려', 'n', pct('critDmg')], ['야근 타워', 'n', tb('critDmg')], ['사풍', 'n', T('critDmg')]], total: E.critMult(), totalMul: true },
         '체력 회복(초당)': { desc: '1초마다 최대 체력의 몇 %를 회복하는지예요.', formula: `기본 ${F.HP_REGEN * 100}% × (1 + 장비 + 타워 %) × 사풍`,
           parts: [['기본', ...P(F.HP_REGEN)], ['장비·인맥·반려', ...P(pct('regen'))], ['야근 타워', ...P(tb('regen'))], ['사풍', 'x', T('regen')]], total: E.hpRegen(), totalPct: true },
-        '보스 데미지': { desc: '보스에게 주는 데미지 배율이에요.', formula: '(1 + 장비 + 타워 %) × 사풍',
-          parts: [['장비·인맥·반려', ...P(pct('boss'))], ['야근 타워', ...P(tb('boss'))], ['사풍', 'x', T('bossDmg')]], total: E.bossDmgMult(), totalMul: true },
-        '재산 획득': { desc: '적을 처치할 때 받는 재산(원) 배율이에요.', formula: '연봉협상 × (1 + 장비 + 타워 %) × 사풍',
-          parts: [['연봉협상 특전', 'x', PERKS.gold.value(E.S.perk.gold)], ['장비·인맥·반려', ...P(pct('gold'))], ['야근 타워', ...P(tb('gold'))], ['사풍', 'x', T('gold')]], total: E.goldMult(), totalMul: true },
+        '보스 데미지': { desc: '보스에게 주는 데미지 배율이에요.', formula: '(1 + 장비 + 타워 %) × 사풍 × 인맥',
+          parts: [['장비·반려', ...P(pct('boss'))], ['야근 타워', ...P(tb('boss'))], ['사풍', 'x', T('bossDmg')], ['인맥', 'x', E.netMult('boss')]], total: E.bossDmgMult(), totalMul: true },
+        '재산 획득': { desc: '적을 처치할 때 받는 재산(원) 배율이에요.', formula: '연봉협상 × (1 + 장비 + 타워 %) × 사풍 × 인맥',
+          parts: [['연봉협상 특전', 'x', PERKS.gold.value(E.S.perk.gold)], ['장비·반려', ...P(pct('gold'))], ['야근 타워', ...P(tb('gold'))], ['사풍', 'x', T('gold')], ['인맥', 'x', E.netMult('gold')]], total: E.goldMult(), totalMul: true },
         '방치 보상': { desc: '앱을 꺼 둔 동안 받는 퇴근 후 정산 배율이에요.', formula: '(1 + 장비 + 타워 %) × 사풍',
           parts: [['장비·인맥·반려', ...P(pct('offline'))], ['야근 타워', ...P(tb('offline'))], ['사풍', 'x', T('offline')]], total: E.offlineMult(), totalMul: true },
         '스킬 쿨타임 감소': { desc: '아아·야근·업무 스킬의 대기 시간이 줄어드는 비율이에요.', formula: `장비 % (최대 ${Math.round(capOf('cdr') * 100)}%)`,
@@ -1636,6 +1644,8 @@
     E.netLevelUp = (id, n = 1) => netDone(NT.levelUp(E.S, H, id, n));
     E.netRankUp = (id) => netDone(NT.rankUp(E.S, H, id));
     E.netLevelAll = () => netDone(NT.levelAll(E.S, H));
+    E.netBuyCards = (n) => netDone(NT.buyCards(E.S, H, n));
+    E.netCardLeft = () => NT.cardShopLeft(E.S, now());
 
     // ===== 책상 반려 (규칙은 pets.js — 서버도 같은 코드). 서버 모드면 sync.js가 서버로, own·codex는 서버 기록 복사본 =====
     // 책상에 올리기(out)만 폰이 정함 (장비 장착과 같은 원칙)

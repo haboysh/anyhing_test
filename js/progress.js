@@ -503,7 +503,10 @@
       const killRate = CFG.margin * (s.ratePeak + s.tapPeak * CFG.tapMax) * (boss ? s.bossMult : 1);
       const tk = s.hpAt(f, boss) / Math.max(1e-300, killRate);
       const net = s.dpsAt(f, boss) - s.regen * s.hp;
-      const td = net <= 0 ? Infinity : s.hp / net;
+      // 적은 간격(gap)마다 그동안의 피해를 한 번에 줌 (engine update). 새 적은 첫 공격까지 gap을 기다리므로
+      // 버티는 시간 = 쓰러지기까지 맞는 횟수 × gap (gap 안에 처리하면 한 대도 안 맞음 — 이직 직후 높은 시작 층, 2026-11-07 봇 seed 22)
+      const gap = boss ? F.ENEMY_HIT_GAP_BOSS : F.ENEMY_HIT_GAP;
+      const td = net <= 0 ? Infinity : gap * Math.ceil(s.hp / (net * gap));
       const ok = td * CFG.survive >= tk && (!boss || tk <= s.bossTime);
       survive.set(k, ok);
       return ok;
