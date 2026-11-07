@@ -298,10 +298,10 @@
       qLv[key] = (qLv[key] || 0) + n;
       push({ u: key, n, r }, (x) => x.u === key && x.r === r, (x) => { x.n += n; });
     }
-    // 번아웃 (수습 탈락은 서버가 셈, 4단계)
-    function reportBurn() {
+    // 번아웃 (수습 탈락은 서버가 셈, 4단계). f = 쓰러진 유효 층 (서버가 그 층 보스를 한 번 더 인정할지 봄)
+    function reportBurn(f) {
       const r = E.S.runId;
-      push({ o: 1, r }, (x) => x.o !== undefined && x.r === r, (x) => { x.o++; });
+      push({ o: 1, f, r }, (x) => x.o !== undefined && x.f === f && x.r === r, (x) => { x.o++; });
     }
     // 아아·야근 사용 (미션·업적, 서버는 쿨타임 상한 안에서만 셈 — 5단계)
     function reportSkill(key) {

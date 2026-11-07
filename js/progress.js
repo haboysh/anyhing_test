@@ -33,8 +33,9 @@
     seenRuns: 6, // 기억하는 회차 표시 수 (옛 회차 처치는 거절)
     recentReqs: 8, // 같은 묶음 재전송 확인용 최근 요청 ID
     probation: { floors: 10, burnouts: 5 }, // 수습 (engine PROBATION과 같음, 테스트가 확인)
-    burnRest: F.REST_MIN,
-    rebossMax: 3, // 최고 층 아래 보스 다시 잡기 허용 (번아웃으로 내려왔을 때만, 번아웃마다 1번, 최대 몇 번 모아 둠) // 번아웃 보고 상한: 서버 시간 ÷ 최소 휴식(초) + 1
+    burnRest: F.REST_MIN, // 번아웃 보고 상한: 서버 시간 ÷ 최소 휴식(초) + 1
+    rebossMax: 3, // 최고 층 아래 보스 다시 잡기 허용: 쓰러진 층 기준 보스 층 목록, 최대 몇 개 모아 둠
+    burnSlack: 2, // 번아웃이 "그 층에서 일어날 수 없었는지" 볼 때 여유 (치명타·버프·스킬 없이, 느린 화면까지)
     maxGold: 1e300,
     skillBucketSec: 180, // 아아·야근 사용 보고 통 = 1번 + 3분 치 (쿨타임마다 1번)
     skillSlack: 0.05, // 통이 이만큼 모자라도 1번 인정 (폰이 쿨타임 끝나자마자 쓰면 서버 시계로 몇백 ms 빠름 — 봇 seed 3)
@@ -60,7 +61,7 @@
   const LV0 = () => G.State.freshState(0).lv;
   const PERK0 = () => G.State.freshState(0).perk;
   // pb = 수습 {n: 번아웃 수, f: 탈락}, nw = 서버가 막 만든 회차 (첫 묶음에서 법인카드 쿨타임 초기화)
-  const runFresh = () => ({ id: null, co: null, o: 0, start: 1, top: 1, prog: 0, last: 1, gold: 0, lv: LV0(), kit: null, pb: { n: 0, f: false }, nw: 0 });
+  const runFresh = () => ({ id: null, co: null, o: 0, start: 1, top: 1, prog: 0, last: 1, gold: 0, lv: LV0(), kit: null, pb: { n: 0, f: false }, nw: 0, rb: [] });
   // v 2 = 재산·근로 강화 레벨이 서버 원본 (3단계). v 1 장부의 run.gold는 "번 재산 추정"이라 잔액으로 못 씀 → 0원, 레벨은 그때 상한으로 자른 값
   // v 3 = 이직·경력·특전이 서버 원본 (4단계): career(쓸 수 있는 경력), perk(특전 레벨), pres(이직 횟수), st(이직 업적 기록), rw(이직 보상 {d: 날, n: 그날 받은 수}), ap(지원 카드·불합격·잠금·새로고침)
   // v 4 = 미션·업적 카운터 (5단계): st(평생 기록 전체), mis(일일·주간 미션 {day, week, prog, claimed, all}), cs(뽑기 일반 연속), ach(서버가 지급한 업적),
@@ -106,7 +107,8 @@
       last: pos(r.last, 1), gold: v1 ? 0 : Math.min(CFG.maxGold, num(r.gold)),
       lv: v1 ? cleanLv(kit && kit.lv, P.max) : cleanLv(r.lv, P.max), kit,
       pb: { n: isInt(pb.n) && pb.n >= 0 ? Math.min(pb.n, 99) : 0, f: pb.f === true }, nw: r.nw === 1 ? 1 : 0,
-      rb: isInt(r.rb) && r.rb > 0 ? Math.min(r.rb, CFG.rebossMax) : 0,
+      // 다시 잡을 수 있는 아래 보스 층 (예전 장부의 숫자 rb는 층을 몰라서 버림)
+      rb: Array.isArray(r.rb) ? r.rb.filter((x) => isInt(x) && x > 0).slice(-CFG.rebossMax) : [],
     };
     const co = G.Career.company(P.run.co);
     P.run.o = G.Career.offsetOf(co ? co.grade : 0);
@@ -332,7 +334,7 @@
     const ratePeak = atk * critEV * aps * (1 + cOn + 2 * nOn + 2 * Math.min(cOn, nOn)) + skill * nightPeak;
     const tapPeak = atk * critEV * nightPeak;
     return {
-      E, o, rate, tap, ratePeak, tapPeak, exec, goldCasts, goldMax, goldKeys: goldKeys.sort().join(','), bossMult: E.bossDmgMult(), hp: E.maxHp(), regen: E.hpRegen(), bossTime: E.bossTime(),
+      E, o, rate, tap, ratePeak, tapPeak, atkMin: atk, apsMin: aps, exec, goldCasts, goldMax, goldKeys: goldKeys.sort().join(','), bossMult: E.bossDmgMult(), hp: E.maxHp(), regen: E.hpRegen(), bossTime: E.bossTime(),
       // 아아·야근 쿨타임 (주4일제 초기화 포함, 잠겼으면 Infinity) — 사용 보고 상한
       skCd: Object.fromEntries(SKILL_KEYS.map((k) => [k, E.skillLocked(k) ? Infinity : Math.max(0.5, Math.min(E.skillCd(k), refreshCd))])),
       hpAt: (f, b) => E.enemyHpAt(f, b), dpsAt: (f, b) => E.enemyDpsAt(f, b), gpk: (f, b) => E.goldPerKill(f, b),
@@ -387,7 +389,7 @@
   // ----- 처치·근로 강화 묶음 한 번 -----
   // P = 장부(clean된 사본, 여기서 고침), L = DB 읽은 값, body = {run: {id}, taps, equipped, slots, out, kit0}, sub = 구독 중
   // 묶음 기록은 폰에서 일어난 순서대로: 처치 {f, b, n, r} → take · 근로 강화 {u: 종류, n: 레벨 수, r} → buy · 법인카드 찬스 재산 {g: 처치 보상 몇 번치, f, r} → cast
-  //   · 장착 바꿈 {k} → rekit · 번아웃 {o: 횟수, r} → burn (수습)
+  //   · 장착 바꿈 {k} → rekit · 번아웃 {o: 횟수, f: 쓰러진 층, r} → burn (수습·보스 다시 만나기)
   // 이직 직전 회차(서버가 아는 옛 회차) 기록은 거절이 아니라 버림(stale) — 합격 응답을 기다리는 동안 폰이 싸운 몫, 새 회차는 0원부터라 이득 없음
   // → end(): {rejected, reasons, bossRecs, ups(산 레벨 수), upRejected(못 산 레벨 수), stale}
   function begin(P, L, body, now, sub) {
@@ -511,6 +513,19 @@
       survive.set(k, ok);
       return ok;
     }
+    // 층 f에서 번아웃이 일어날 수 있었나 (아니라고 확실할 때만 false — 정직한 폰을 막지 않게 넉넉히):
+    //   · 적 한 대가 체력보다 약하고 다음 공격 전에 다 회복되면 못 쓰러짐 (engine update: 프레임마다 회복 → 간격마다 한 대)
+    //   · 치명타·아아·야근·스킬 없이도 적의 첫 공격(새 적은 간격만큼 기다림) 전에 처리하면 한 대도 안 맞음
+    function canBurn(s, f) {
+      const boss = isBoss(f);
+      const gap = boss ? F.ENEMY_HIT_GAP_BOSS : F.ENEMY_HIT_GAP;
+      const k = CFG.burnSlack;
+      const dps = s.dpsAt(f, boss) * k;
+      if (dps * gap < s.hp && dps <= s.regen * s.hp) return false;
+      const per = s.atkMin * (boss ? s.bossMult : 1);
+      const tk = Math.ceil(s.hpAt(f, boss) / Math.max(1e-300, per)) / Math.max(1e-300, s.apsMin);
+      return tk * k >= gap;
+    }
     function take(k, n0) {
       if (!(n0 > 0)) return 0;
       if (runOk(typeof k.r === 'string' ? k.r : null, n0) !== 'ok') return 0;
@@ -518,13 +533,15 @@
       const boss = k.b === 1 || k.b === true;
       if (!isInt(f) || f < 1 + P.run.o || f > P.run.top) { rej('floor', n0); return 0; }
       if (boss !== isBoss(f)) { rej('boss', n0); return 0; }
-      // 최고 층 아래 보스: 정상 폰은 보스를 잡으면 다음 층으로 가고 층을 고를 수 없음 → 번아웃 후퇴로 다시 만난 만큼만 인정
+      // 최고 층 아래 보스: 정상 폰은 보스를 잡으면 다음 층으로 가고 층을 고를 수 없음 → 번아웃 후퇴로 그 보스를 다시 만난 만큼만 인정
       // (조작 앱이 낮은 보스를 반복해 확정 드롭을 받던 것 막기, 2026-11-06 봇 군집 점검)
+      // rb = 쓰러진 층 목록 (burn이 그때 능력치로 "정말 쓰러질 수 있었나" 확인한 것). 그 층이 이 보스 층이거나 바로 위 층이어야.
+      // 잡을 때 다시 확인하지 않음: 정직한 폰은 쓰러진 뒤 근로 강화·보스 프리셋으로 세져서 잡음 (다시 확인하면 봇 192판 중 4번 거절)
       if (boss && f < P.run.top) {
-        const ok = Math.min(n0, P.run.rb | 0);
+        let ok = 0;
+        P.run.rb = P.run.rb.filter((x) => ((x === f || x === f + 1) && ok < n0 ? (ok++, false) : true));
         if (ok < n0) rej('reboss', n0 - ok);
         if (!ok) return 0;
-        P.run.rb -= ok;
         n0 = ok;
       }
       let n = 0;
@@ -657,8 +674,12 @@
       // 폰은 번아웃하면 그 층 처치 수를 0으로 되돌림 (후퇴 안 해도) → 서버도 맨 위 층 진행을 0으로 (서버가 폰보다 한 층 앞서가지 않게)
       if (n > 0) {
         P.run.prog = 0;
-        // 보스 다음 층에서 번아웃 → 보스 층으로 후퇴하면 그 보스를 한 번 더 만남 (engine advance는 보스 처치 후 항상 다음 층)
-        P.run.rb = Math.min(CFG.rebossMax, (P.run.rb | 0) + n);
+        // 보스 다시 만나기: 보스 다음 층에서 쓰러져 보스 층으로 후퇴(engine advance는 보스 처치 후 항상 다음 층)하거나, 보스 층에서 쓰러짐.
+        // 쓰러진 층 f(폰 보고)에서 정말 쓰러질 수 있었을 때만 그 보스 층을 허용 (가짜 번아웃 + 아래 보스 반복 막기, 2026-11-07 보안 점검)
+        const f = e.f;
+        if (isInt(f) && f >= 1 + P.run.o && f <= P.run.top && (isBoss(f) || isBoss(f - 1)) && canBurn(stats(), f)) {
+          P.run.rb = [...P.run.rb, ...Array(Math.min(n, CFG.rebossMax)).fill(f)].slice(-CFG.rebossMax);
+        }
       }
       const pb = P.run.pb;
       if (P.pres > 0 && !pb.f && P.run.top < P.run.start + CFG.probation.floors) {

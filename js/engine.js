@@ -510,7 +510,7 @@
       // 번아웃: 멘탈 확률로 후퇴 없음. 마감 초과(보스 시간 초과)는 항상 후퇴
       const retreated = reason === 'deadline' || !(rng() < E.mentalChance());
       if (reason === 'burnout') stat('burnout');
-      if (reason === 'burnout' && E.mode === 'main' && E.burnSink) E.burnSink(); // 서버 모드: 번아웃 보고 (서버가 수습 탈락을 셈)
+      if (reason === 'burnout' && E.mode === 'main' && E.burnSink) E.burnSink(f); // 서버 모드: 번아웃 보고 (서버가 수습 탈락을 셈, 쓰러진 층 f로 보스 다시 만나기 허용)
       // 수습: 이직 직후 시작 층 +10층 안에서 번아웃이 쌓이면 수습 탈락 → 조건 없이 재지원 (갇힘 방지)
       const pb = E.S.probation;
       if (reason === 'burnout' && E.mode === 'main' && E.S.prestiges > 0 && !pb.failed && E.S.runMax < E.S.runStart + PROBATION.floors) {
