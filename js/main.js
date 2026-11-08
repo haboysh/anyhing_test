@@ -47,7 +47,11 @@
     // 이직·이직 보상은 정식판에선 서버가 합격 때 바로 정함 (sync.js applyTo, op career)
     bus.on('bossRecord', ({ floor }) => sync.bossRecord(floor));
 
+    // 효과음 (기기 설정, 저전력이면 중요한 소리만)
+    const sound = G.Sound ? G.Sound.attach(G.Sound.createSound({ isLowPower: () => engine.S.settings.lowPower === true }), bus, engine) : null;
+
     ui = G.createUI(engine, bus, {
+      sound,
       isSubscribed: () => Sub.isActive(),
       setSubscribedForTest(on) { return sync.subTest(on).then((r) => { applySpeed(); return r; }); },
       applySpeed,

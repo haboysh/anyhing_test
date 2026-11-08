@@ -33,6 +33,8 @@
   };
 
   function createUI(engine, bus, hooks) {
+    const SND = hooks.sound || null;
+    const snd = (name) => SND && SND.play(name);
     const E = engine;
     const SP = G.Sprites;
     const $ = (id) => document.getElementById(id);
@@ -212,6 +214,7 @@
 
     // 결재 도장 연출: 큰 성공 순간(강화 성공·이직 합격·장악 승리)에 빨간 인주 도장이 쾅 (0.5초, 효과 끄기·동작 줄이기 존중)
     function approveStamp(label) {
+      snd('stamp'); // 소리는 연출을 꺼도 남
       if (document.hidden || !E.fxOn('fx') || (window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches)) return;
       const old = document.querySelector('.approve-stamp');
       if (old) old.remove();
@@ -620,6 +623,14 @@
       </div>`;
     }
 
+    // 효과음 켜기·음량 (이 기기에만 저장)
+    function soundBox() {
+      if (!SND || !SND.supported) return '';
+      return `<div class="set-grid">
+          <button class="set-tg ${SND.on ? 'on' : ''}" data-snd="on"><span>효과음</span><b>${SND.on ? 'ON' : 'OFF'}</b></button>
+          <button class="set-tg ${SND.on ? 'on' : ''}" data-snd="vol" ${SND.on ? '' : 'disabled'}><span>음량</span><b>${SND.volName()}</b></button>
+        </div>${E.S.settings.lowPower && SND.on ? '<div class="small">저전력 모드: 중요한 소리만 나요</div>' : ''}`;
+    }
     // ----- 설정 창 (톱니): 설정·계정·기록·장비 보너스 -----
     function showSettings() {
       const S = E.S;
@@ -627,6 +638,7 @@
           <div class="set-grid">${[['lowPower', '저전력 모드'], ['shake', '화면 흔들림'], ['dmgNumbers', '데미지 숫자'], ['fx', '타격 연출']].map(([k, n]) => {
             const on = E.fxOn(k) || (k === 'lowPower' && S.settings.lowPower);
             return `<button class="set-tg ${on ? 'on' : ''}" data-set="${k}" ${k !== 'lowPower' && S.settings.lowPower ? 'disabled' : ''}><span>${n}</span><b>${on ? 'ON' : 'OFF'}</b></button>`; }).join('')}</div>
+          ${soundBox()}
           <div class="stat-line">최고 ${S.maxStage}층 · 이직 ${S.prestiges}회 · 전투력 <b>${fmt(E.power())}</b></div>
           ${accountBox()}
           ${bonusBox()}
@@ -1465,6 +1477,7 @@
       const html = `<div class="g-grid ${results.length > 11 ? 'tight' : ''}">${results.map((r) => (r.pet ? petResultCard(r) : r.skill ? skillCard(r.skill, tags(r)) : itemCard(r.item, tags(r)))).join('')}</div>`;
       recentNew.clear();
       const best = Math.max(...results.map((r) => r.grade));
+      snd(best >= 3 ? 'gachaHigh' : 'gacha'); // 영웅 이상이면 반짝
       const cnt = GR.map((_, g) => results.filter((r) => r.grade === g).length);
       const sum = `<div class="g-sum">${cnt.map((n, g) => (n ? `<span style="--gc:${GR[g].color}" class="${g === best ? 'best' : ''}"><i></i>${GR[g].name} ${n}</span>` : '')).join('')}</div>`;
       const petCodex = results.reduce((a, r) => a + (r.codex || 0), 0);
@@ -2125,7 +2138,7 @@
       const t = e.target.closest('button');
       if (!t) return;
       if (t.dataset.sks !== undefined || t.dataset.skr || t.dataset.skup || t.dataset.skx !== undefined || t.dataset.skex) { onSkillClick(t); return; }
-      if (t.dataset.buy) { const m = t.dataset.bm; if (E.buy(t.dataset.buy, m === 'max' ? 'max' : Number(m) || 1)) { renderPanelLive(); renderHud(); } }
+      if (t.dataset.buy) { const m = t.dataset.bm; if (E.buy(t.dataset.buy, m === 'max' ? 'max' : Number(m) || 1)) { snd('upgrade'); renderPanelLive(); renderHud(); } }
       else if (t.dataset.mode) { E.setBuyMode(t.dataset.mode); renderPanel(); }
       else if (t.dataset.perk) { Y.buyPerk(t.dataset.perk).then((r) => { if (r.ok) renderPanel(); else if (r.reason) toast(r.reason); }); }
       else if (t.dataset.item) {
@@ -2360,6 +2373,13 @@
     // 창 바깥 빈 곳 누르면 닫기 (취소 버튼이 있으면 취소, 없으면 확인과 같음 — 보상 받기 창도 놓치지 않게)
     // 설정 창 안 버튼
     $('modal-body').addEventListener('click', (e) => {
+      const sb = e.target.closest('button[data-snd]');
+      if (sb && !sb.disabled && SND) {
+        if (sb.dataset.snd === 'on') SND.setOn(!SND.on); else SND.cycleVol();
+        snd('coin');
+        showSettings();
+        return;
+      }
       const t = e.target.closest('button[data-set], button[data-act^="acct-"], button[data-act^="dev-"], button[data-act^="corp-"], button[data-act="tut-replay"]');
       if (!t || t.disabled) return;
       const k = t.dataset.set;
@@ -2376,6 +2396,8 @@
       openPets() { $('modal').classList.remove('show'); tab = 'equip'; equipView = 'pet'; renderPanel(); $('panel-body').scrollTop = 0; },
     });
     $('si-board').addEventListener('click', () => GU.showBoard());
+    // 버튼 누름 소리 (작게 딸깍, 저전력이면 안 남)
+    document.addEventListener('click', (e) => { const b = e.target.closest('button'); if (b && !b.disabled) snd('click'); }, true);
     // 어느 창에서든 [확률] → 게시판 확률 공개 해당 칸 (구매·강화 화면에서 바로 확인)
     document.addEventListener('click', (e) => {
       const t = e.target.closest('[data-rates]');
