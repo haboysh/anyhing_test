@@ -605,11 +605,14 @@
       if (E.enemy && E.restTimer <= 0) { E.taps++; hit('tap'); }
     };
 
-    // 자동 진행 켜기/끄기. 꺼져 있을 때 누르면 바로 다음 층 도전.
+    // 자동 진행 켜기/끄기. 꺼져 있을 때 누르면 바로 다음 층 도전 (이미 열린 층일 때만).
+    // 맨 위 층(아직 다 처리 안 함)에서 끄고 다시 켜면 자동 진행만 켜고 그 층을 이어서 — 예전엔 한 층(보스 포함)을 건너뛰어
+    // 서버가 그 위 처치를 모두 거절하고 층을 되돌렸음 (2026-11-12 코드 검토)
     E.toggleAdvance = function () {
       if (E.mode !== 'main') return;
       if (E.S.autoAdvance) { E.S.autoAdvance = false; return; }
       E.S.autoAdvance = true;
+      if (E.S.stage >= E.S.runMax) return;
       advance();
       // 번아웃 휴식 중이면 휴식이 끝날 때 새 층의 적이 나옴
       if (!E.isResting()) spawn();
@@ -995,6 +998,9 @@
           S.kill = 0;
           if (E.mode === 'main' && !E.side) { E.enemy = null; E.spawnDelay = 0; }
         }
+        // 접속 때: 맨 위 층 처치 수는 서버 진행(prog)까지만 — 앱이 꺼져 못 보낸 처치가 기기 세이브에만 남아 있으면
+        // 폰이 서버보다 먼저 다음 층으로 가서 그 위 처치가 모두 거절되고 층이 되돌려졌음 (2026-11-12 코드 검토)
+        if (mode === 'hello' && S.stage === S.runMax && int(r.prog) && S.kill > r.prog) S.kill = r.prog;
       }
       if (int(p.max)) S.maxStage = mode === 'hello' ? Math.max(1, p.max) : Math.max(1, Math.min(S.maxStage, Math.max(p.max, E.eff(S.runMax))));
       const changed = JSON.stringify([S.stage, S.runMax, S.maxStage, S.runId, S.rew.bossRec]) !== before;

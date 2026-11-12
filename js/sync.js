@@ -47,6 +47,20 @@
     insufficient_petticket: '반려 뽑기권이 부족해요',
     insufficient_pethero: '영웅 이상 뽑기권이 없어요',
     bad_product: '없는 상품이에요',
+    insufficient_pass: '출입증이 부족해요',
+    insufficient_kaltoe: '칼퇴권이 부족해요',
+    no_cards: '회사 카드를 다시 받아 왔어요. 다시 골라 주세요',
+    bad_card: '회사 카드가 바뀌었어요. 다시 골라 주세요',
+    bad_perk: '없는 특전이에요',
+    bad_dept: '없는 부서예요',
+    bad_day: '채울 수 없는 날이에요',
+    bad_achievement: '없는 업적이에요',
+    order_owned_by_other: '다른 계정의 주문이에요',
+    delete_failed: '계정을 삭제하지 못했어요. 잠시 후 다시 해주세요',
+    no_auth: '로그인이 풀렸어요. 앱을 다시 열어 주세요',
+    bad_auth: '로그인이 풀렸어요. 앱을 다시 열어 주세요',
+    too_large: '보낼 내용이 너무 커요',
+    save_too_large: '세이브가 너무 커요',
   };
   // 서버가 규칙상 거절하면(rejected) 그 이유(한국어)를 그대로
   const msg = (e) => (e && e.extra && typeof e.extra.reason === 'string' && e.extra.reason) || ERR[e && e.code] || '서버 오류가 났어요';
@@ -106,10 +120,12 @@
     async function settle(action) {
       if (SPEND.has(action) && Y.pendingKills() > 0) await Y.flushKills();
     }
-    function invAction(action, args, after, noSettle = false) {
+    // onFail(e): 서버가 거절했을 때 (오류를 그대로 다시 던지기 전에) — 예: 뽑기권이 다른 기기에서 쓰였으면 지갑을 서버 값으로
+    function invAction(action, args, after, noSettle = false, onFail = null) {
       if (!invReady) return notReady();
       return (noSettle ? Promise.resolve() : settle(action)).then(() => serial(() => guard(async () => {
-        const r = await cloud.inv({ action, ...invBody(args) });
+        let r;
+        try { r = await cloud.inv({ action, ...invBody(args) }); } catch (e) { if (onFail) await onFail(e); throw e; }
         applyR(r);
         const ret = E.localize(r.ret || { ok: true });
         if (after) after(ret);
@@ -146,7 +162,8 @@
         if (kind !== 'pet') return local({ ok: false, reason: '뽑기권은 반려 뽑기에만 써요' });
         if (pay === 'hero' && ((E.S.pethero | 0) < 1 || n !== 1)) return local({ ok: false, reason: '영웅 이상 뽑기권이 없어요' });
         if (pay === 'ticket' && (E.S.petticket | 0) < n) return local({ ok: false, reason: '반려 뽑기권이 부족해요' });
-        return invAction('gacha', { n, kind, pay, floor: E.gachaFloor() }, (ret) => { if (ret.ok) E.gachaStats(ret.results, ret.cost); }, false);
+        // 다른 기기에서 뽑기권을 썼으면 서버가 거절 → 지갑·반려를 서버 값으로 다시 받아 버튼이 바로 맞게 (2026-11-12)
+        return invAction('gacha', { n, kind, pay, floor: E.gachaFloor() }, (ret) => { if (ret.ok) E.gachaStats(ret.results, ret.cost); }, false, ticketFail);
       }
       if (E.S.bonus < cost) return local({ ok: false, reason: '성과급이 부족해요' });
       // 재산을 안 쓰는 뽑기는 쌓인 처치 기록을 먼저 보내지 않음 (서버 왕복 1번 줄임).
@@ -155,6 +172,15 @@
       const quick = kind === 'skill' || (kind !== 'pet' && !E.S.autoAppraise && E.bagFree() - n >= 20);
       return invAction('gacha', { n, kind, floor: E.gachaFloor() }, (ret) => { if (ret.ok) E.gachaStats(ret.results, ret.cost); }, quick);
     };
+
+    // 뽑기권 거절(서버 지갑 부족 — 규칙 판정 'rejected' 또는 DB 판정 insufficient_*)이면 서버 값으로 다시 맞춤
+    async function ticketFail(e) {
+      const code = e && e.code;
+      const reason = (e && e.extra && e.extra.reason) || '';
+      if (code === 'insufficient_petticket' || code === 'insufficient_pethero' || (code === 'rejected' && /뽑기권/.test(reason))) {
+        try { await refreshInventory(); } catch (e2) { /* 다음 접속 때 */ }
+      }
+    }
 
     // ----- 부서 장악 묶음: 승리·받기·한 번에 처리·소탕·출입증 구매는 서버가 판정 (규칙은 depts.js) -----
     const Sub = G.Subscription;
@@ -237,13 +263,19 @@
     };
     const skillStartDue = () => online && invReady && !E.S.skills.granted && G.Skills.isOpen(E.S.maxStage) && Date.now() - skillStartAt >= 30000;
     // 장악전·미팅·특근 승리 보고. 장악전·특근은 서버가 진행 장부 최고 층으로 확인하므로 쌓인 처치를 먼저 보냄
+    let sidePending = 0; // 서버 확인을 기다리는 승리 보고 수
+    Y.sideBusy = () => sidePending > 0;
     if (online) {
-      E.sideReady = () => invReady;
+      // 승리 결과(서버 확인)를 기다리는 동안은 새 도전을 막음 — 예전엔 그 사이 같은 장악전을 또 시작하면 다 싸운 뒤
+      // "아직 도전할 수 없어요"로 거절됐음 (장악전 번호가 서버보다 하나 뒤, 2026-11-12)
+      E.sideReady = () => invReady && !sidePending;
       E.sideSink = async (kind, args) => {
-        if (kind !== 'meeting') await Y.flushKills();
-        const action = kind === 'conquest' ? 'conquer' : kind;
-        const r = await deptAction(action, args);
-        return r;
+        sidePending++;
+        try {
+          if (kind !== 'meeting') await Y.flushKills();
+          const action = kind === 'conquest' ? 'conquer' : kind;
+          return await deptAction(action, args);
+        } finally { sidePending--; onChange(); }
       };
     }
     // 테스트 구독 켜기/끄기 (서버 모드: 서버 기록, 테스트 결제가 켜진 서버에서만)
@@ -401,7 +433,7 @@
         // 서버 최고 층보다 높은 층의 쌓인 처치는 어차피 거절 → 버림
         if (Number.isInteger(top)) {
           killQ = killQ.filter((k) => k.f === undefined || k.g !== undefined || !(k.f > top));
-          killQN = killQ.reduce((a, k) => a + (k.f !== undefined && k.g === undefined ? k.n : 0), 0);
+          killQN = killQ.reduce((a, k) => a + (k.f !== undefined && k.g === undefined && k.o === undefined ? k.n : 0), 0); // 번아웃 기록 {o, f}엔 n이 없음 (NaN 방지)
         }
       } else if (Number.isInteger(ret.progress.bossRec)) E.S.rew.bossRec = Math.max(E.S.rew.bossRec, ret.progress.bossRec);
       const down = econ(prog || (ret.progress.run && { id: ret.progress.run.id, gold: ret.progress.run.gold, lv: ret.progress.run.lv }));
@@ -493,20 +525,24 @@
     };
 
     // ----- 퇴근 후 정산: 재산·장비·결재 도장 모두 서버 (서버가 접속 때 잰 시간 × 서버 능력치) -----
+    // 창에 보이는 시간도 서버가 실제로 정산한 시간 (예전엔 폰 시간이라 서버가 덜 줬을 때 "8시간 · 재산 +0원"처럼 보였음).
+    // 1분 미만·못 받음이면 창 없음 → 서버가 남은 정산 시간을 기억해 다음 접속 때 다시 (index.ts hello가 남은 시간도 알려 줌, 2026-11-12)
     Y.claimOffline = async (opts = {}) => {
       if (!online) return E.claimOffline(opts);
+      if (!invReady) return null;
       const info = E.claimOffline({ ...opts, serverDrops: true, serverGold: true });
-      if (!info || !invReady) return info;
+      if (!info) return null;
       try {
         const r = await serial(() => cloud.offline({ sec: Math.floor(info.sec), f: info.f, itemFloor: info.itemFloor, ...invBody({}) }));
         applyR(r);
         const ret = E.localize(r.ret || {});
+        if (typeof ret.sec === 'number' && isFinite(ret.sec)) info.sec = ret.sec;
         info.gold = typeof ret.gold === 'number' && isFinite(ret.gold) ? ret.gold : 0;
         info.items = (ret.items || []).filter(Boolean);
         info.stamps = ret.stamps || 0;
-      } catch (e) { /* 못 받음 (서버가 정산 시간을 기억하고 있어 다음에 다시) */ }
+      } catch (e) { onChange(); return null; }
       onChange();
-      return info;
+      return info.sec >= 60 ? info : null;
     };
 
     // 가방 확장 (성과급/법카)
@@ -712,7 +748,12 @@
         return Promise.resolve(E.devGrant({ corp: amount }));
       }
       return guard(async () => {
-        const r = await cloud.purchaseTest(productId);
+        let r;
+        try { r = await cloud.purchaseTest(productId); } catch (e) {
+          // 다른 기기에서 이미 산 1회 한정 상품: 산 것으로 표시 + 지갑(뽑기권)을 서버 값으로 → 버튼이 바로 바뀜 (2026-11-12)
+          if (e && e.code === 'already_bought') { E.S.starter = true; try { await refreshInventory(); } catch (e2) { /* 다음 접속 때 */ } }
+          throw e;
+        }
         E.setWallet(r.wallet);
         if (r.monthly && Sub && Sub.setMonthly) Sub.setMonthly({ until: r.monthly });
         onChange();
@@ -808,7 +849,8 @@
       const run1 = async () => {
         if (!cloud.uid()) await net(cloud.connect());
         if (invReady && Y.pendingKills()) await Y.flushKills(); // 다시 접속: 쌓인 처치를 먼저 보내야 서버 층이 폰과 같음
-        const h = await net(cloud.hello());
+        // 버튼 작업(뽑기·강화…)과 한 줄로: 작업 응답보다 먼저 읽은 옛 아이템 목록으로 덮어 방금 뽑은 게 사라지지 않게 (2026-11-12)
+        const h = await net(serial(() => cloud.hello()));
         const meta = cloud.meta();
         const sameUser = meta.uid === cloud.uid();
         // 다른 기기가 마지막으로 저장했으면 그 설정·본 안내를 합침 (진행은 아래 서버 값, 고르기 창 없음 — 6단계). 장착·스킬 칸은 서버 아이템을 받은 뒤에

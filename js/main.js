@@ -134,7 +134,8 @@
       uiTimer += dt;
       if (uiTimer > (lowPower() ? 0.5 : 0.1)) { uiTimer = 0; ui.tick(); }
       saveTimer += dt;
-      if (saveTimer > 5) { saveTimer = 0; save(); sync.maybePush(); }
+      // 5초마다: 저장 + 구독 2배속 다시 확인 (켜 둔 채 구독이 끝나면 2배속이 남아 서버가 처치를 거절하던 것, 2026-11-12)
+      if (saveTimer > 5) { saveTimer = 0; save(); sync.maybePush(); applySpeed(); }
       next();
     }
     requestAnimationFrame(loop);

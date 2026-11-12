@@ -68,6 +68,7 @@
     let enhTarget = 10;
     let enhStop12 = false;
     let enhStopDown = false;
+    let autoEnhBusy = false; // 자동 강화 서버 답 기다리는 중 (연타 방지)
     let gachaKind = 'acc'; // 상점 뽑기 종류
     let equipView = 'gear'; // 장비 탭 위 전환: gear(장비) | pet(책상 반려)
     let petBusy = false;
@@ -269,6 +270,12 @@
     }
     function askChoice(title, html, yesLabel, noLabel) {
       return new Promise((resolve) => openChoice({ title, html, yesLabel, noLabel, resolve }));
+    }
+    // 서버 답이 온 뒤 창 다시 그리기: 그 창(제목이 prefix로 시작)이 아직 떠 있을 때만. orClosed면 아무 창도 없을 때도 다시 띄움 (소탕 확인 뒤 부서 창으로)
+    // 답을 기다리는 동안 다른 창을 열었으면 덮지 않음 (예전엔 출석·미션·부서·인맥·이직 창이 다른 창 위로 다시 떴음, 2026-11-12)
+    function reshow(prefix, fn, orClosed = false) {
+      const open = $('modal').classList.contains('show');
+      if (open ? $('modal-title').textContent.startsWith(prefix) : orClosed) fn();
     }
     // 팝업이 닫힌 뒤 가려졌던 선택 팝업 다시 띄우기
     function afterModalClose() {
@@ -1382,7 +1389,11 @@
         else enhJ.protect = Math.max(0, Math.min(I.ENHANCE.protect.max, enhJ.protect + step));
         renderSheet();
       } else if (a === 'auto-enh') {
-        Y.autoEnhance(it.id, { target: enhTarget, boost: enhJ.boost, protect: enhJ.protect, stopAt12: enhStop12, stopOnDown: enhStopDown }).then((r) => {
+        // 서버 답을 기다리는 동안 다시 누르면 무시 — 연타하면 두 번째가 첫 번째가 멈춘 곳(+12 진입·강등)에서 이어서 강화해
+        // "+12 진입 시 멈춤·강등 시 멈춤"을 건너뛰고 파괴 구간까지 갔음 (2026-11-12 코드 검토)
+        if (autoEnhBusy) return;
+        autoEnhBusy = true;
+        Promise.resolve().then(() => Y.autoEnhance(it.id, { target: enhTarget, boost: enhJ.boost, protect: enhJ.protect, stopAt12: enhStop12, stopOnDown: enhStopDown })).finally(() => { autoEnhBusy = false; }).then((r) => {
           if (!r.ok) { toast(r.reason); return; }
           const sm = r.summary;
           const STOP = { target: '목표 도달', gold: '재산 부족', jjam: '짬 부족', stamp: '결재 도장 부족', break: '파괴됨', down: '강등됨', at12: '+12 진입', maxTries: '시도 한도' };
@@ -1504,7 +1515,7 @@
             <li>반려 뽑기권 <b>${fmt(ST.tickets)}장</b> <small>(반려 뽑기 ${fmt(ST.tickets)}회)</small></li>
             <li><b style="color:${GR[ST.heroMin].color}">${gname} 이상</b> 반려 뽑기권 <b>${fmt(ST.hero)}장</b> <small>(${gname}·${GR[ST.heroMin + 1].name}·${GR[ST.heroMin + 2].name}만)</small></li>
           </ul>
-          <div class="row"><div class="info"><div class="small">계정당 1번만 살 수 있어요</div></div>
+          <div class="row"><div class="info"><div class="small">계정당 1번만 살 수 있어요${E.S.maxStage < G.Pets.CFG.unlock ? `<br><b>반려는 최고 ${G.Pets.CFG.unlock}층부터 써요</b>` : ''}</div></div>
             ${done ? '<button class="buy" disabled>구매 완료</button>' : `<button class="buy" data-corp="${ST.id}">₩${ST.krw.toLocaleString('ko-KR')}</button>`}</div>
           <div class="small">지금은 테스트 결제라 실제 돈이 나가지 않아요.</div>
         </div>`;
@@ -1583,7 +1594,7 @@
     function showApply() {
       // 정식판: 카드는 서버가 뽑음 → 없으면 받아 와서 다시 그림
       if (Y.online && !E.S.apply.cards && !E.applyBlock()) {
-        Y.loadCards().then((r) => { if (r.ok && E.S.apply.cards) showApply(); else toast(r.reason || '잠시 후 다시 해주세요'); });
+        Y.loadCards().then((r) => { if (r.ok && E.S.apply.cards) reshow('이직 지원', showApply, true); else toast(r.reason || '잠시 후 다시 해주세요'); });
         return;
       }
       const cards = E.applyCards();
@@ -1615,7 +1626,13 @@
       if (!t || t.disabled) return;
       const a = t.dataset.ap;
       if (a === 'rank-' || a === 'rank+') { applyRank = Math.max(0, Math.min(E.maxApplyRank(), applyRank + (a === 'rank+' ? 1 : -1))); showApply(); return; }
-      if (a === 'refresh') { Y.refreshCards().then((r) => { if (!r.ok) toast(r.reason); showApply(); }); return; }
+      // 새로고침도 서버 답을 기다리는 동안 막음 (연타하면 50·150 두 번 다 빠지고 횟수도 다 씀, 새로고침 중 지원하면 옛 카드라 거절 — 2026-11-12 코드 검토)
+      if (a === 'refresh') {
+        if (applyBusy) return;
+        applyBusy = true;
+        Y.refreshCards().then((r) => { applyBusy = false; if (!r.ok) toast(r.reason); reshow('이직 지원', showApply); });
+        return;
+      }
       if (a.startsWith('go')) {
         if (applyBusy) return;
         const idx = Number(a.slice(2));
@@ -1631,16 +1648,17 @@
         if (Y.online) toast('서류 심사 중…');
         Y.applyTo(idx, rank).then((r) => {
           applyBusy = false;
-          if (!r.ok) { toast(r.reason); if (Y.online) showApply(); return; }
+          if (!r.ok) { toast(r.reason); if (Y.online) reshow('이직 지원', showApply); return; }
           if (r.accepted) { $('modal').classList.remove('show'); showModal('합격!', `경력 +${r.gain}점<br>${E.companyName()} ${E.rankName()}(으)로 출근해요`); approveStamp('합격'); }
           else if (r.allOut) { $('modal').classList.remove('show'); showModal('전부 불합격...', '<div class="verdict-stamp">불합격</div>' + (E.probationFailed() ? '이번엔 잔류해요. 수습 탈락 중이라 바로 다시 지원할 수 있어요' : `이번엔 잔류해요. 최고 ${E.S.apply.lockUntil}층을 넘으면 다시 지원할 수 있어요`)); }
-          else { toast(`불합격... (합격 확률 ${Math.round(r.chance * 100)}%)`); showApply(); }
+          else { toast(`불합격... (합격 확률 ${Math.round(r.chance * 100)}%)`); reshow('이직 지원', showApply); }
           renderPanel();
         });
       }
     });
 
     // ----- 출석 -----
+    let attBusy = false;
     function showAttendance() {
       const st = E.attendance();
       const cells = st.days.map((d) => {
@@ -1658,10 +1676,12 @@
     $('modal-body').addEventListener('click', (e) => {
       const t = e.target.closest('button[data-at]');
       if (!t || t.disabled) return;
+      if (attBusy) return; // 연타 방지 (두 번째는 서버가 막지만 알림이 두 번 뜸)
       const day = Number(t.dataset.at);
       const st = E.attendance();
+      attBusy = true;
       const p = st.today === day ? Y.claimAttendance() : Y.fillAttendance(day);
-      p.then((r) => { if (r.ok) snd('coin'); toast(r.ok ? `출석 ${day}일 · 성과급 +${r.bonus}개${r.pass ? ` · 패스·월정액 +${fmt(r.pass)}개` : ''}${r.item ? ` · ${GR[r.item.grade].name} ${itemName(r.item)}` : ''}` : r.reason); showAttendance(); renderHud(); });
+      p.then((r) => { attBusy = false; if (r.ok) snd('coin'); toast(r.ok ? `출석 ${day}일 · 성과급 +${r.bonus}개${r.pass ? ` · 패스·월정액 +${fmt(r.pass)}개` : ''}${r.item ? ` · ${GR[r.item.grade].name} ${itemName(r.item)}` : ''}` : r.reason); reshow('출석', showAttendance); renderHud(); });
     });
 
     // 미션·업적 한 줄: 체크 칸 · 이름 · 진행 막대 · 보상 (받을 수 있으면 형광펜)
@@ -1693,7 +1713,8 @@
       if (all && !all.disabled && !achBusy) { claimAllAchievements(); return; }
       const t = e.target.closest('button[data-ac]');
       if (!t || t.disabled || achBusy) return;
-      Y.claimAchievement(t.dataset.ac).then((r) => { if (r.ok) snd('coin'); toast(r.ok ? `성과급 +${r.bonus}개` : r.reason); showAchievements(true); renderHud(); });
+      achBusy = true; // 하나 받는 동안도 연타 막음 (두 번째는 "이미 받았어요" + 서버 다시 맞추기가 한 번 더 일어났음)
+      Y.claimAchievement(t.dataset.ac).then((r) => { achBusy = false; if (r.ok) snd('coin'); toast(r.ok ? `성과급 +${r.bonus}개` : r.reason); reshow('업적', () => showAchievements(true)); renderHud(); });
     });
 
     // 받을 수 있는 업적을 하나씩 차례로 받음 (서버 요청 횟수 제한에 안 걸리게 동시에 보내지 않음)
@@ -1717,6 +1738,7 @@
     }
 
     // ----- 미션 -----
+    let misBusy = false;
     function showMissions() {
       const st = E.missions();
       const row = (m) => checkRow({ attr: `data-mi="${m.id}"`, name: m.name, claimed: m.claimed, ready: m.ready, prog: m.prog, need: m.need,
@@ -1730,8 +1752,9 @@
     }
     $('modal-body').addEventListener('click', (e) => {
       const t = e.target.closest('button[data-mi]');
-      if (!t || t.disabled) return;
-      Y.claimMission(t.dataset.mi).then((r) => { if (r.ok) snd('coin'); toast(r.ok ? `성과급 +${r.bonus}개` : r.reason); showMissions(); renderHud(); });
+      if (!t || t.disabled || misBusy) return;
+      misBusy = true; // 연타 방지
+      Y.claimMission(t.dataset.mi).then((r) => { misBusy = false; if (r.ok) snd('coin'); toast(r.ok ? `성과급 +${r.bonus}개` : r.reason); reshow('미션', showMissions); renderHud(); });
     });
 
     // ----- 야근 타워 -----
@@ -1787,7 +1810,7 @@
       const S = E.S;
       const info = E.deptInfo(hooks.isSubscribed());
       const c = info.conquest;
-      const lock = E.mode !== 'main' || deptBusy || !Y.invReady() ? 'disabled' : '';
+      const lock = E.mode !== 'main' || deptBusy || !Y.invReady() || (Y.sideBusy && Y.sideBusy()) ? 'disabled' : '';
       const target = DN.BY_ID[c.dept];
       const cq = c.promotion
         ? `<div class="dp-title"><b>승격전 ${c.n}</b> · ${target.name} Lv${S.dept.owned[c.dept].lv}→${S.dept.owned[c.dept].lv + 1}</div>`
@@ -1841,7 +1864,7 @@
       if (a === 'conquer') return start(E.conquestStart());
       if (a === 'meet') return start(E.meetingStart(id));
       if (a === 'dungeon') return start(E.dungeonStart(id, Number(t.dataset.k)));
-      const done = (msg) => (r) => { deptBusy = false; toast(r.ok ? msg(r) : r.reason); showDept(); renderHud(); };
+      const done = (msg) => (r) => { deptBusy = false; toast(r.ok ? msg(r) : r.reason); reshow('부서 장악', showDept, true); renderHud(); };
       // 소탕은 출입증·칼퇴권이 같이 빠지니 한 번 확인 (사용자 2026-11-10)
       if (a === 'sweep') {
         const n = Number(t.dataset.n);
@@ -1928,7 +1951,7 @@
       const name = id && NT.BY_ID[id] ? NT.BY_ID[id].name : '';
       netBusy = true;
       showNet();
-      const done = (msg) => (r) => { netBusy = false; toast(r.ok ? msg(r) : r.reason); showNet(); renderHud(); };
+      const done = (msg) => (r) => { netBusy = false; toast(r.ok ? msg(r) : r.reason); reshow('인맥 관리', showNet); renderHud(); };
       if (a === 'lv') Y.netLevelUp(id, Number(t.dataset.n)).then(done((r) => `${name} 친분 Lv${r.lv} · 명함 −${fmt(r.cost)}장`));
       else if (a === 'rank') Y.netRankUp(id).then(done((r) => `${name}와(과) ${r.rankName}! · 성과급 −${fmt(r.cost)}개`));
       else if (a === 'all') Y.netLevelAll().then(done((r) => `친분 +${r.n} · 명함 −${fmt(r.cost)}장`));
