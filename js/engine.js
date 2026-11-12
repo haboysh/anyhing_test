@@ -1235,10 +1235,20 @@
 
     // 뽑기 n회 (1/11/35). kind = 'acc'(장신구) | 'equip'(장비). 아이템 층 = 최고 층(유효)
     E.gachaFloor = () => Math.max(1, E.S.maxStage);
-    E.gachaPull = function (n, kind = 'acc') {
-      const r = Inv.gacha(E.S, H, n, kind, E.gachaFloor());
+    // pay = 'ticket': 반려 뽑기권 n장 / 'hero': 영웅 이상 반려 뽑기권 1장 (반려만, 규칙은 inventory.js)
+    E.gachaPull = function (n, kind = 'acc', pay) {
+      const r = Inv.gacha(E.S, H, n, kind, E.gachaFloor(), pay);
       if (r.ok) gachaStats(r.results, r.cost);
       return r;
+    };
+    // 첫 결제 패키지 (서버 없는 테스트판, 테스트 결제): 계정당 1회 = 반려 뽑기권 + 영웅 이상 반려 뽑기권 (meta.js STARTER). 서버 모드는 purchase_starter
+    E.buyStarter = function () {
+      if (E.S.starter) return no('이미 산 상품이에요 (1회 한정)');
+      E.S.starter = true;
+      E.S.petticket = (E.S.petticket | 0) + G.Meta.STARTER.tickets;
+      E.S.pethero = (E.S.pethero | 0) + G.Meta.STARTER.hero;
+      emit('save');
+      return ok({ tickets: G.Meta.STARTER.tickets });
     };
     // 뽑기 기록 (업적·미션). 서버 뽑기 결과에도 씀
     function gachaStats(results, cost) {
@@ -1357,10 +1367,11 @@
         if (w.ver < walletVer) return;
         walletVer = w.ver;
       }
-      for (const k of ['bonus', 'corp', 'jjam', 'stamps', 'shards', 'pass', 'kaltoe', 'namecard']) {
+      for (const k of ['bonus', 'corp', 'jjam', 'stamps', 'shards', 'pass', 'kaltoe', 'namecard', 'petticket', 'pethero']) {
         const v = cleanCount(w[k]);
         if (v !== null) E.S[k] = v;
       }
+      if (typeof w.starter === 'boolean') E.S.starter = w.starter; // 첫 결제 패키지 산 적 있는지 (서버 purchases)
     };
     E.resetWalletVer = () => { walletVer = -1; };
     E.setGachaState = function (st, kind = 'acc') {

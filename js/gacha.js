@@ -134,6 +134,21 @@
     return { results, state };
   }
 
+  // 등급 하한 뽑기 (영웅 이상 반려 뽑기권, meta.js STARTER): 지금 레벨 확률표(확률업 없음)에서 min 등급 이상만 남겨 그 비율대로 1번.
+  // 뽑기 상태(횟수·확률업·천장)는 안 바꿈. rng()는 정확히 1번 씀
+  function pullAtLeast(gstate, rng, min, c = CONFIG) {
+    const s = norm(gstate);
+    const level = levelFor(s.count, c);
+    const w = weights(level, false, c).map((x, i) => (i >= min ? x : 0));
+    return { grade: Math.max(min, pick(w, rng())), boosted: false, pity: false, level };
+  }
+  // 위 뽑기의 등급별 확률 (%, 화면·확률 공개용)
+  function ratesAtLeast(level, min, c = CONFIG) {
+    const w = weights(level, false, c).map((x, i) => (i >= min ? x : 0));
+    const t = sum(w);
+    return w.map((x) => (t ? (100 * x) / t : 0));
+  }
+
   // 뽑기 n회 가격 (성과급). 없는 묶음이면 null
   function costFor(n) {
     return Number.isInteger(n) && Object.prototype.hasOwnProperty.call(CONFIG.PRICES, n) ? CONFIG.PRICES[n] : null;
@@ -153,5 +168,5 @@
     };
   }
 
-  G.Gacha = { CONFIG, SKILL, configFor, fresh, levelFor, nextLevelAt, weights, rates, isBoostPull, pull, pullMany, costFor, status };
+  G.Gacha = { CONFIG, SKILL, configFor, fresh, levelFor, nextLevelAt, weights, rates, isBoostPull, pull, pullMany, pullAtLeast, ratesAtLeast, costFor, status };
 })(globalThis.Game = globalThis.Game || {});

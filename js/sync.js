@@ -43,6 +43,10 @@
     tower_locked: '서버 기록으로는 아직이에요. 잠시 후 다시 눌러 주세요',
     ad_wait: `광고는 ${(G.Rewards && G.Rewards.REW.ad.gapSec) || 30}초 뒤에 다시 볼 수 있어요`,
     bad_mission: '없는 미션이에요',
+    already_bought: '이미 산 상품이에요 (1회 한정)',
+    insufficient_petticket: '반려 뽑기권이 부족해요',
+    insufficient_pethero: '영웅 이상 뽑기권이 없어요',
+    bad_product: '없는 상품이에요',
   };
   // 서버가 규칙상 거절하면(rejected) 그 이유(한국어)를 그대로
   const msg = (e) => (e && e.extra && typeof e.extra.reason === 'string' && e.extra.reason) || ERR[e && e.code] || '서버 오류가 났어요';
@@ -132,11 +136,18 @@
     Y.marketClaim = () => run(() => E.marketClaim(), 'marketClaim', {});
     Y.buyStamps = (n) => run(() => E.buyStamps(n), 'stampBuy', { n });
     // 뽑기: 가방·성과급 부족은 서버에 보내지 않음
-    Y.pull = (n, kind = 'acc') => {
-      if (!online) return local(E.gachaPull(n, kind));
+    // pay = 'ticket': 반려 뽑기권 / 'hero': 영웅 이상 반려 뽑기권 (서버가 차감·판정)
+    Y.pull = (n, kind = 'acc', pay) => {
+      if (!online) return local(E.gachaPull(n, kind, pay));
       const cost = G.Gacha.costFor(n);
       if (cost === null) return local({ ok: false, reason: '없는 뽑기 횟수예요' });
       if (kind !== 'skill' && kind !== 'pet' && E.bagFree() < n) return local({ ok: false, reason: `가방 공간이 부족해요 (${n}칸 필요)` });
+      if (pay === 'ticket' || pay === 'hero') {
+        if (kind !== 'pet') return local({ ok: false, reason: '뽑기권은 반려 뽑기에만 써요' });
+        if (pay === 'hero' && ((E.S.pethero | 0) < 1 || n !== 1)) return local({ ok: false, reason: '영웅 이상 뽑기권이 없어요' });
+        if (pay === 'ticket' && (E.S.petticket | 0) < n) return local({ ok: false, reason: '반려 뽑기권이 부족해요' });
+        return invAction('gacha', { n, kind, pay, floor: E.gachaFloor() }, (ret) => { if (ret.ok) E.gachaStats(ret.results, ret.cost); }, false);
+      }
       if (E.S.bonus < cost) return local({ ok: false, reason: '성과급이 부족해요' });
       // 재산을 안 쓰는 뽑기는 쌓인 처치 기록을 먼저 보내지 않음 (서버 왕복 1번 줄임).
       // 스킬: 재산·가방 안 씀. 장비·장신구: 자동 감정이 꺼져 있고 가방이 넉넉할 때만 (처치 드롭과 순서가 바뀌어도 가방이 안 넘치게).
@@ -696,6 +707,7 @@
     // 법카 구매 (실결제 연결 전: 테스트 결제). productId = 서버 PRODUCTS 키
     Y.testCorp = (amount, productId = 'corp_1000') => {
       if (!online) {
+        if (productId === G.Meta.STARTER.id) return Promise.resolve(E.buyStarter());
         if (productId === 'monthly_30' && Sub && Sub.setMonthlyForTest) Sub.setMonthlyForTest(G.Meta.PASS.monthlyDays);
         return Promise.resolve(E.devGrant({ corp: amount }));
       }

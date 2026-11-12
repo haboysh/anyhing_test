@@ -80,6 +80,13 @@
       });
       tables.push({ caption: '단계 확률 (등급·반려와 따로)', head: ['단계', '확률'], rows: P.TIERS.map((t, i) => [t, pct(P.CFG.tierRates[i] / tot)]) });
       notes.push('반려는 가방을 안 써요. 뽑기 레벨이 올라도 업무력 보너스는 없어요 (장비·장신구 뽑기만)');
+      const ST = G.Meta && G.Meta.STARTER;
+      if (ST) {
+        const g0 = ST.heroMin;
+        const at = (lv) => G.Gacha.ratesAtLeast(lv, g0, c).slice(g0).map((p, i) => `${GN[g0 + i]} ${p.toFixed(3)}%`).join(' · ');
+        notes.push(`반려 뽑기권(첫 결제 패키지) 1장 = 반려 뽑기 1회, 확률은 성과급 뽑기와 같아요`);
+        notes.push(`영웅 이상 반려 뽑기권(첫 결제 패키지, 계정당 1장): ${GN[g0]} 이상만 나와요. 그 안의 비율은 위 표 그대로 — Lv.0 ${at(0)}, Lv.${c.LEVELS.length} ${at(c.LEVELS.length)}. 반려·단계는 위 표 그대로, 뽑기 횟수·확률업·천장엔 안 들어가요`);
+      }
     }
     return { key: 'gacha_' + kind, title: meta.title, group: '뽑기', tables, notes };
   }

@@ -52,6 +52,7 @@
     let deferred = null;
     let busy = false; // 서버 요청 중 (버튼 연타 방지)
     let pullingN = 0; // 지금 서버 답을 기다리는 뽑기 버튼 (n회)
+    let pullingPay = ''; // 그 버튼의 결제: '' 성과급 | 'ticket' 반려 뽑기권 | 'hero' 영웅 이상 뽑기권
     const Y = hooks.sync;
     let GU = null; // 사내 게시판·튜토리얼 화면 (ui-guide.js)
     let lastBuffs = '';
@@ -372,10 +373,38 @@
       if (E.fxOn('fx')) sparks();
     });
     bus.on('bossDefeated', ({ stage }) => toast(`${stage}층 보스 격파!`));
+    // 김대리 한마디: 승진·신기록·번아웃 때 꼭(위 알림이 사라진 뒤), 새 층에선 가끔 (사용자 2026-11-11)
+    let sayAt = 0;
+    let sayStage = E.S.stage;
+    function mentorSay(kind, vars = {}) {
+      const T = G.GuideText;
+      const pool = ((T && T.SAY && T.SAY[kind]) || []).filter((l) => !/\{(\w+)\}/.test(l) || [...l.matchAll(/\{(\w+)\}/g)].every((m) => vars[m[1]] !== undefined));
+      if (!pool.length || document.hidden) return;
+      sayAt = performance.now();
+      const text = pool[Math.floor(Math.random() * pool.length)].replace(/\{(\w+)\}/g, (_, k) => vars[k]);
+      const old = document.querySelector('.mentor-say');
+      if (old) old.remove();
+      const el = document.createElement('div');
+      el.className = 'mentor-say';
+      el.innerHTML = '<img src="img/chars/mentor.png" alt=""><span></span>';
+      el.querySelector('span').textContent = text;
+      $('battle').appendChild(el);
+      setTimeout(() => el.remove(), 3500);
+    }
+    bus.on('spawn', (en) => {
+      const up = E.S.stage > sayStage;
+      sayStage = E.S.stage;
+      if (!up || en.boss || performance.now() - sayAt < 90000 || Math.random() > 0.12) return;
+      const h = new Date().getHours();
+      mentorSay(h >= 23 || h < 5 ? 'night' : 'normal');
+    });
+    bus.on('promote', ({ rank }) => setTimeout(() => mentorSay('record', { rank }), 1900));
+    bus.on('bossRecord', ({ floor }) => setTimeout(() => mentorSay('record', { floor }), 1900));
     bus.on('promote', ({ rank }) => toast(`${rank}(으)로 승진!`));
     bus.on('fail', ({ reason, retreated }) => {
       setSprite($('player'), 'playerTired', 3);
       toast(FAIL_MSG[reason === 'burnout' && !retreated ? 'burnoutKeep' : reason] || '실패!');
+      if (reason === 'burnout') setTimeout(() => mentorSay('burnout'), 1900);
     });
     bus.on('unlock', ({ key, name }) => (GU ? GU.unlockCard(key, name) : toast(`${name} 해금!`)));
     bus.on('probationFail', () => {
@@ -399,7 +428,7 @@
     bus.on('sideStart', ({ kind }) => { toast(`${SIDE_NAME[kind]} 시작! 앱을 내리면 취소돼요 (재화는 그대로)`); renderPanel(); });
     bus.on('sideWave', ({ wave, of }) => toast(wave === of ? '부서장 등장!' : `웨이브 ${wave}/${of}`));
     bus.on('sideEnd', ({ kind, win, reason, pending }) => {
-      if (!win) toast(`${SIDE_NAME[kind]} ${END_MSG[reason] || '실패'} · 다시 도전할 수 있어요${kind === 'dungeon' ? ' (출입증 그대로)' : ''}`);
+      if (!win) toast(`${SIDE_NAME[kind]} ${END_MSG[reason] || '실패'} · 다시 도전할 수 있어요${kind === 'dungeon' ? ' · 출입증은 그대로예요' : ''}`);
       else if (pending) toast('결과 확인 중…');
       renderPanel();
     });
@@ -414,7 +443,7 @@
       else toast(`${r.k}단계 클리어! ${gainText(r)}${r.first ? ` · 성과급 +${r.first}개` : ''}`);
       renderPanel(); renderHud();
     });
-    bus.on('deptHeld', ({ id, held, full }) => toast(full ? `${G.Depts.BY_ID[id].name} 창고가 가득 차서 장비를 그만 만들어요` : `가방이 가득 차서 장비 ${held}개는 창고에 남았어요`));
+    bus.on('deptHeld', ({ id, held, full }) => toast(full ? `${G.Depts.BY_ID[id].name} 창고 가득! 가방을 비워 주세요` : `가방이 꽉 차서 장비 ${held}개를 창고에 맡겼어요`));
     bus.on('skill', ({ name }) => toast(`${name}!`));
     // 업무 스킬: 주인공 머리 위에 스킬 이름
     bus.on('workSkill', ({ key, name, grade }) => {
@@ -864,6 +893,7 @@
       else if (a === 'mk-claim') {
         Y.marketClaim().then((r) => {
           const who = BUYERS[Math.floor(Math.random() * BUYERS.length)];
+          if (r.ok) snd('coin');
           toast(r.ok ? (r.count ? `${who} 외 ${Math.max(0, r.count - 1)}명이 사갔어요 · 성과급 +${r.bonus}개` : `성과급 +${r.bonus}개`) : r.reason);
           showMarket(); renderPanel(); renderHud();
         });
@@ -1054,7 +1084,7 @@
       if (m < 60) return m + '분';
       return Math.floor(m / 60) + '시간' + (m % 60 ? ` ${m % 60}분` : '');
     }
-    const BUYERS = ['옆 부서 김대리', '택배 기사님', '퇴사한 박과장', '거래처 이사님', '신입 인턴', '사장님 조카', '경비 아저씨', '야근 동기'];
+    const BUYERS = ['거래처 이사님', '사장님 조카', '경비실 아저씨', '야근 동기', '옆 부서 김대리', '퇴사한 박과장', '택배 기사님', '신입 사원 이인턴', '팀장님', '인사팀 주임', '경영지원팀 차장', '재무팀 부장', '마케팅팀 대리', '개발팀 과장', '기획팀 주임', '총무팀 사원', '영업팀 이사', '전산팀 팀장', '홍보팀 대리', '프리랜서', '칼퇴하고싶다', '불꽃개발자', '야근장인', '회사생활3년차', '주말만기다림', '월급받는날', '퇴근길행복', '커피수혈중', '회식은1차만', '야근왕등극', '사무실화분', '월요병환자', '점심뭐먹지', '연차아껴씀', '탕비실요정', '엑셀장인', '출근길만원버스', '금요일5시59분', '재택희망', '정시퇴근러', '키보드수집가', '단톡방눈팅족', '이직준비중', '내일부터운동', '모니터두대', '사직서품은자', '장비덕후', '알람다섯개', '반차쓴날', '결재기다림']; // content/market.json buyers + nicknames
     function showMarket() {
       const st = E.marketStatus();
       const left = (s) => (s <= 0 ? '<b class="gold">팔림</b>' : '손님 기다리는 중'); // 남은 시간은 안 보여줌 (랜덤, 2026-10-27 사용자)
@@ -1426,7 +1456,9 @@
         <div class="gacha-box">
           <div class="seg seg4">${KINDS.map(([k, n]) => `<button data-act="gk-${k}" class="${gachaKind === k ? 'active' : ''}">${n}</button>`).join('')}</div>
           <div class="gacha-sub">${skillLocked ? `최고 ${gachaKind === 'pet' ? G.Pets.CFG.unlock : G.Skills.CFG.unlock}층에서 열려요` : sub}<button class="rate-link" data-rates="gacha_${gachaKind}">확률</button></div>
-          <div class="pull-row">${prices.map((n) => `<button class="buy pull-btn${pullingN === n ? ' pulling' : ''}" data-pull="${n}" ${skillLocked || pullingN ? 'disabled' : ''}><span>${n}회</span><b>성과급&nbsp;${fmt(C.PRICES[n])}</b></button>`).join('')}</div>
+          <div class="pull-row">${prices.map((n) => (n === 1 && heroTicketOn() ? heroBtn(skillLocked) : petTicketOn(n) ? ticketBtn(n, skillLocked)
+            : `<button class="buy pull-btn${pullingN === n && !pullingPay ? ' pulling' : ''}" data-pull="${n}" ${skillLocked || pullingN ? 'disabled' : ''}><span>${n}회</span><b>성과급&nbsp;${fmt(C.PRICES[n])}</b></button>`)).join('')}</div>
+          ${gachaKind === 'pet' && (E.S.petticket | 0) > 0 ? `<div class="small center">반려 뽑기권 <b>${fmt(E.S.petticket)}장</b> · 있으면 성과급 대신 뽑기권을 써요</div>` : ''}
           <div class="g-prog">
             <span>Lv.<b>${st.level}</b>/${st.maxLevel}</span>
             <div class="bar thin"><div class="lv-fill" style="width:${lvPct}%"></div></div>
@@ -1439,12 +1471,42 @@
           <div class="info"><div class="name">무료 성과급 <span class="lv">광고</span></div><div class="desc">오늘 ${E.adsLeft()}/${G.Rewards.REW.ad.perDay}번 남음</div></div>
           <button class="buy" data-act="ad" ${E.adsLeft() > 0 ? '' : 'disabled'}><span>광고 보기</span>${E.adsLeft() > 0 ? '받기' : '내일'}</button>
         </div>
+        ${starterBox()}
         ${subBox()}
         ${monthlyBox()}
         ${corpShop()}
         <div class="act-row">
           <button class="act-btn" data-act="corp-test">테스트 충전 +${fmt(UI_CFG.testCorp)}장</button>
           <button class="act-btn" data-act="corp-swap" ${S.corp > 0 ? '' : 'disabled'}>법카 → 성과급</button>
+        </div>`;
+    }
+
+    // 반려 뽑기권 (첫 결제 패키지): 그 횟수만큼 있으면 [n회 성과급] 버튼이 [n회 뽑기권 n장]으로 (사용자 2026-11-10: 칸을 따로 만들지 않음)
+    const petTicketOn = (n) => gachaKind === 'pet' && (E.S.petticket | 0) >= n;
+    const ticketBtn = (n, locked) => `<button class="buy pull-btn ticket-btn${pullingN === n && pullingPay === 'ticket' ? ' pulling' : ''}" data-tpull="${n}" ${locked || pullingN ? 'disabled' : ''}><span>${n}회</span><b>뽑기권&nbsp;${n}장</b></button>`;
+    // 영웅 이상 반려 뽑기권: 가지고 있으면 [1회 성과급 100] 자리에 (다 쓰면 원래 버튼)
+    const heroTicketOn = () => gachaKind === 'pet' && (E.S.pethero | 0) > 0;
+    function heroBtn(locked) {
+      const g = GR[G.Meta.STARTER.heroMin];
+      return `<button class="buy pull-btn hero-btn${pullingN === 1 && pullingPay === 'hero' ? ' pulling' : ''}" data-hpull="1" style="--gc:${g.color}" ${locked || pullingN ? 'disabled' : ''}>
+        <span>${g.name} 이상 ${fmt(E.S.pethero)}장</span><b>뽑기권&nbsp;사용</b></button>`;
+    }
+    // 첫 결제 패키지 카드 (계정당 1회). 테스트 결제가 켜진 곳에서만 살 수 있음 (정식판은 실결제 붙일 때)
+    function starterBox() {
+      const ST = G.Meta.STARTER;
+      const done = !!E.S.starter;
+      const gname = GR[ST.heroMin].name;
+      return `<div class="sub-box starter-box${done ? ' done' : ''}">
+          <div class="starter-seal" aria-hidden="true">${done ? '구매<br>완료' : '1회<br>한정'}</div>
+          <div class="sub-title">첫 결제 패키지</div>
+          <div class="starter-val"><b>${ST.valuePct}%</b><span>같은 값 법카보다</span></div>
+          <ul class="starter-list">
+            <li>반려 뽑기권 <b>${fmt(ST.tickets)}장</b> <small>(반려 뽑기 ${fmt(ST.tickets)}회)</small></li>
+            <li><b style="color:${GR[ST.heroMin].color}">${gname} 이상</b> 반려 뽑기권 <b>${fmt(ST.hero)}장</b> <small>(${gname}·${GR[ST.heroMin + 1].name}·${GR[ST.heroMin + 2].name}만)</small></li>
+          </ul>
+          <div class="row"><div class="info"><div class="small">계정당 1번만 살 수 있어요</div></div>
+            ${done ? '<button class="buy" disabled>구매 완료</button>' : `<button class="buy" data-corp="${ST.id}">₩${ST.krw.toLocaleString('ko-KR')}</button>`}</div>
+          <div class="small">지금은 테스트 결제라 실제 돈이 나가지 않아요.</div>
         </div>`;
     }
 
@@ -1599,7 +1661,7 @@
       const day = Number(t.dataset.at);
       const st = E.attendance();
       const p = st.today === day ? Y.claimAttendance() : Y.fillAttendance(day);
-      p.then((r) => { toast(r.ok ? `출석 ${day}일 · 성과급 +${r.bonus}개${r.pass ? ` · 패스·월정액 +${fmt(r.pass)}개` : ''}${r.item ? ` · ${GR[r.item.grade].name} ${itemName(r.item)}` : ''}` : r.reason); showAttendance(); renderHud(); });
+      p.then((r) => { if (r.ok) snd('coin'); toast(r.ok ? `출석 ${day}일 · 성과급 +${r.bonus}개${r.pass ? ` · 패스·월정액 +${fmt(r.pass)}개` : ''}${r.item ? ` · ${GR[r.item.grade].name} ${itemName(r.item)}` : ''}` : r.reason); showAttendance(); renderHud(); });
     });
 
     // 미션·업적 한 줄: 체크 칸 · 이름 · 진행 막대 · 보상 (받을 수 있으면 형광펜)
@@ -1631,7 +1693,7 @@
       if (all && !all.disabled && !achBusy) { claimAllAchievements(); return; }
       const t = e.target.closest('button[data-ac]');
       if (!t || t.disabled || achBusy) return;
-      Y.claimAchievement(t.dataset.ac).then((r) => { toast(r.ok ? `성과급 +${r.bonus}개` : r.reason); showAchievements(true); renderHud(); });
+      Y.claimAchievement(t.dataset.ac).then((r) => { if (r.ok) snd('coin'); toast(r.ok ? `성과급 +${r.bonus}개` : r.reason); showAchievements(true); renderHud(); });
     });
 
     // 받을 수 있는 업적을 하나씩 차례로 받음 (서버 요청 횟수 제한에 안 걸리게 동시에 보내지 않음)
@@ -1648,6 +1710,7 @@
         n++;
       }
       achBusy = false;
+      if (n) snd('coin');
       toast(n ? `업적 ${n}개 · 성과급 +${fmt(got)}개${fail ? ` (멈춤: ${fail})` : ''}` : fail || '받을 업적이 없어요');
       if ($('modal').classList.contains('show') && $('modal-title').textContent.startsWith('업적')) showAchievements(true);
       renderHud();
@@ -1668,7 +1731,7 @@
     $('modal-body').addEventListener('click', (e) => {
       const t = e.target.closest('button[data-mi]');
       if (!t || t.disabled) return;
-      Y.claimMission(t.dataset.mi).then((r) => { toast(r.ok ? `성과급 +${r.bonus}개` : r.reason); showMissions(); renderHud(); });
+      Y.claimMission(t.dataset.mi).then((r) => { if (r.ok) snd('coin'); toast(r.ok ? `성과급 +${r.bonus}개` : r.reason); showMissions(); renderHud(); });
     });
 
     // ----- 야근 타워 -----
@@ -1746,7 +1809,7 @@
           <div class="dp-title"><b>${m.name}</b> · ${DN.BY_ID[m.id].name}</div>
           <div class="small">명함 ${DN.CFG.meeting.namecard(m.n)}장 · 출입증 ${DN.CFG.meeting.pass}장 · 하루 1번</div>
           <div class="act-row"><button class="act-btn" data-dp="meet" data-id="${m.id}" ${m.done || lock ? 'disabled' : ''}>${m.done ? `오늘 완료 ${ICON.check}` : '만나기'}</button>
-          <button class="act-btn" data-dp="quick" data-id="${m.id}" ${!m.won || m.done || S.kaltoe < 1 || lock ? 'disabled' : ''}>한 번에 처리 · 칼퇴권 1</button></div></div>`).join('');
+          <button class="act-btn" data-dp="quick" data-id="${m.id}" ${!m.won || m.done || S.kaltoe < 1 || lock ? 'disabled' : ''}>바로 처리 · 칼퇴권 1</button></div></div>`).join('');
         const dg = E.dungeonInfo().map((d) => {
           const most = Math.min(S.pass, S.kaltoe, DN.CFG.dungeon.sweepMax);
           const rw = d.best ? `보상 ${gainText(d.reward.goldHours ? { gold: E.deptGold({ goldHours: d.reward.goldHours }) } : d.reward.equip ? { items: { length: d.reward.equip } } : d.reward)} (${d.best}단계 기준)` : '1단계부터 도전해요';
@@ -1757,7 +1820,7 @@
             ${d.error ? `<div class="small">${d.error}</div>` : ''}</div>`;
         }).join('');
         body = `<div class="sub-title">부서 생산 <small>최대 ${info.cap}시간</small></div><div class="dp-table">${prod}</div>
-          <button class="act-btn gold-btn wide" data-dp="claim" ${anyProd && !lock ? '' : 'disabled'}>일괄 받기</button>
+          <button class="act-btn gold-btn wide" data-dp="claim" ${anyProd && !lock ? '' : 'disabled'}>모두 받기</button>
           <div class="small">원은 받는 순간의 층 기준이에요 (이직 직후엔 적어요)</div>
           <div class="sub-title">외부 미팅 <small>하루 1번</small></div>${meet}
           <div class="small">명함은 사내 탭 [인맥 관리]에서 친분을 쌓는 데 써요</div>
@@ -1779,11 +1842,20 @@
       if (a === 'meet') return start(E.meetingStart(id));
       if (a === 'dungeon') return start(E.dungeonStart(id, Number(t.dataset.k)));
       const done = (msg) => (r) => { deptBusy = false; toast(r.ok ? msg(r) : r.reason); showDept(); renderHud(); };
+      // 소탕은 출입증·칼퇴권이 같이 빠지니 한 번 확인 (사용자 2026-11-10)
+      if (a === 'sweep') {
+        const n = Number(t.dataset.n);
+        askConfirm('소탕할까요?', `출입증·칼퇴권 <b>${n}장씩</b> 써서 ${n}번 바로 끝내요<br><small>보유 출입증 ${fmt(E.S.pass)}장 · 칼퇴권 ${fmt(E.S.kaltoe)}장</small>`, '소탕하기', () => {
+          deptBusy = true;
+          Y.dungeonSweep(id, n).then(done((r) => `칼퇴 성공! 소탕 ${r.n}회 · ${gainText(r)}`));
+        });
+        modalNo = showDept; // 취소하면 부서 창으로
+        return;
+      }
       deptBusy = true;
       showDept();
-      if (a === 'claim') Y.deptClaim().then(done((r) => `받았어요! ${gainText(r)}`));
-      else if (a === 'quick') Y.meetingQuick(id).then(done((r) => `한 번에 처리 · 명함 +${r.namecard}장 · 출입증 +${r.pass}장`));
-      else if (a === 'sweep') Y.dungeonSweep(id, Number(t.dataset.n)).then(done((r) => `소탕 ${r.n}회 · ${gainText(r)}`));
+      if (a === 'claim') Y.deptClaim().then(done((r) => `부서들이 열일했어요! ${gainText(r)}`));
+      else if (a === 'quick') Y.meetingQuick(id).then(done((r) => `미팅 바로 끝! 명함 +${r.namecard}장 · 출입증 +${r.pass}장`));
       else if (a === 'pass') Y.buyPass().then(done((r) => `출입증 +${r.pass}장`));
       else deptBusy = false;
     });
@@ -1940,7 +2012,7 @@
     }
     function petResultCard(r) {
       const p = PT.BY_KEY[r.pet];
-      const tags = [r.pity ? '천장' : '', r.boosted ? 'UP' : '', r.isNew ? 'NEW' : ''].filter(Boolean);
+      const tags = [r.hero ? `${GR[G.Meta.STARTER.heroMin].name}+` : '', r.pity ? '천장' : '', r.boosted ? 'UP' : '', r.isNew ? 'NEW' : ''].filter(Boolean);
       return `<div class="g-card pet-g ${p.grade >= 3 ? 'hi' : ''}" style="--gc:${GR[p.grade].color}">
         ${tags.length ? `<div class="g-tags">${tags.map((x) => `<i>${x}</i>`).join('')}</div>` : ''}
         ${petFace(r.pet, r.tier)}
@@ -2087,6 +2159,15 @@
         </div>`;
     }
 
+    function buyStarter() {
+      const ST = G.Meta.STARTER;
+      if (busy || E.S.starter) return;
+      askConfirm('첫 결제 패키지를 살까요?', `반려 뽑기권 <b class="gold">${fmt(ST.tickets)}장</b> + ${GR[ST.heroMin].name} 이상 반려 뽑기권 <b class="gold">${fmt(ST.hero)}장</b> · ₩${ST.krw.toLocaleString('ko-KR')}<br><span class="small">계정당 1번 · 테스트 결제 (실제 결제 없음)</span>`, '구매', () => {
+        busy = true;
+        Y.testCorp(0, ST.id).then((r) => { busy = false; toast(r.ok ? `반려 뽑기권 +${fmt(ST.tickets)}장 · ${GR[ST.heroMin].name} 이상 뽑기권 +${fmt(ST.hero)}장` : r.reason); renderPanel(); renderHud(); });
+      });
+    }
+
     function subBox() {
       const on = hooks.isSubscribed();
       return `
@@ -2107,6 +2188,7 @@
       } else if (tab === 'gacha') {
         const lockedSkill = gachaLocked();
         document.querySelectorAll('[data-pull]').forEach((b) => { setDis(b, lockedSkill || S.bonus < GA.costFor(Number(b.dataset.pull))); });
+        document.querySelectorAll('[data-tpull]').forEach((b) => { setDis(b, lockedSkill || (S.petticket | 0) < Number(b.dataset.tpull)); });
       }
       if (detailId !== null) renderCostLive();
       if (tab !== 'grow') return;
@@ -2167,19 +2249,22 @@
         bagShow = BAG_PAGE;
         renderPanel();
       }
-      else if (t.dataset.pull) {
+      else if (t.dataset.pull || t.dataset.tpull || t.dataset.hpull) {
         if (busy) return;
         busy = true;
-        pullingN = Number(t.dataset.pull);
+        pullingPay = t.dataset.hpull ? 'hero' : t.dataset.tpull ? 'ticket' : '';
+        pullingN = Number(t.dataset.pull || t.dataset.tpull || t.dataset.hpull);
         t.classList.add('pulling'); // 서버 답을 기다리는 동안 바로 눌린 티
-        Y.pull(pullingN, gachaKind).then((r) => {
+        Y.pull(pullingN, gachaKind, pullingPay || undefined).then((r) => {
           busy = false;
           pullingN = 0;
+          pullingPay = '';
           if (!r.ok) toast(r.reason);
           else showGachaResult(r.results);
           renderPanel();
         });
       } else if (t.dataset.corp) {
+        if (t.dataset.corp === G.Meta.STARTER.id) { buyStarter(); return; }
         const p0 = UI_CFG.corpProducts.find((x) => x.id === t.dataset.corp);
         const p = p0 && p0.monthly ? { ...p0, corp: G.Meta.PASS.monthlyCorp, krw: G.Meta.PASS.monthlyKrw } : p0;
         if (!p || busy) return;
@@ -2275,7 +2360,7 @@
       jjam: { name: '짬', get: ['강화 실패', '합성 실패', '야근 타워', '부서 장악'], use: ['강화 보정', '재감정'] },
       shards: { name: '장신구 조각', get: ['적 처치', '보스 처치', '부서 장악'], use: ['장신구 상자'], note: LOW_DROP_NOTE },
       career: { name: '경력', get: ['이직'], use: ['특전 강화'], note: '이직해도 남아요' },
-      namecard: { name: '명함', get: ['외부 미팅', '기획팀 생산', '미팅 한 번에 처리 (칼퇴권)'], use: ['인맥 친분 올리기'], go: 'net' },
+      namecard: { name: '명함', get: ['외부 미팅', '기획팀 생산', '미팅 바로 처리 (칼퇴권)'], use: ['인맥 친분 올리기'], go: 'net' },
       stamps: { name: '결재 도장', get: ['출석', '미션', '적 처치', '방치 보상', '야근 타워', '상점 구매', '부서 장악'], use: ['장비 강화 (+5부터)', '흔적 복구'], note: LOW_DROP_NOTE },
     };
     function showWalletInfo(key) {
@@ -2391,6 +2476,7 @@
     });
     // 사내 게시판·튜토리얼 (ui-guide.js)
     GU = G.createGuideUI({
+      snd,
       E, Y, $, fmt, showModal, askConfirm, toast, showAttendance, showMissions, showNet,
       openTab(t) { $('modal').classList.remove('show'); tab = t; renderPanel(); $('panel-body').scrollTop = 0; },
       openPets() { $('modal').classList.remove('show'); tab = 'equip'; equipView = 'pet'; renderPanel(); $('panel-body').scrollTop = 0; },

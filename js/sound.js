@@ -76,7 +76,7 @@
           const d = noiseBuf.getChannelData(0);
           for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
         }
-        if (ctx.state === 'suspended' && !(W.document && W.document.hidden)) ctx.resume();
+        if (ctx.state === 'suspended' && !(W.document && W.document.hidden)) ctx.resume().catch(() => {});
       } catch (e) { ctx = null; }
     }
 
@@ -160,7 +160,7 @@
       prefs.on = !!on;
       savePrefs();
       if (prefs.on) unlock(); // 켜는 버튼을 누른 순간 = 터치 중
-      else if (ctx && ctx.state === 'running') ctx.suspend();
+      else if (ctx && ctx.state === 'running') ctx.suspend().catch(() => {});
     }
     function cycleVol() {
       prefs.vol = (prefs.vol + 1) % VOLS.length;
@@ -173,7 +173,7 @@
       for (const ev of ['pointerdown', 'touchend', 'click', 'keydown']) W.document.addEventListener(ev, unlock, true);
       W.document.addEventListener('visibilitychange', () => {
         if (!ctx) return;
-        if (W.document.hidden) { if (ctx.state === 'running') ctx.suspend(); } else if (prefs.on) ctx.resume().catch(() => {});
+        if (W.document.hidden) { if (ctx.state === 'running') ctx.suspend().catch(() => {}); } else if (prefs.on) ctx.resume().catch(() => {});
       });
     }
 
@@ -192,7 +192,15 @@
     bus.on('hit', ({ crit }) => snd.play(crit ? 'crit' : 'hit'));
     bus.on('kill', () => snd.play('kill'));
     bus.on('hurt', () => snd.play('hurt'));
-    bus.on('spawn', (en) => { if (en && en.boss) snd.play('bossAppear'); });
+    // 새 층으로 올라가면 '띠링' (보스는 등장음). 시작할 때·후퇴는 소리 없음
+    let lastStage = E && E.S ? E.S.stage : 0;
+    bus.on('spawn', (en) => {
+      const st = E && E.S ? E.S.stage : 0;
+      if (en && en.boss) snd.play('bossAppear');
+      else if (st > lastStage) snd.play('floor');
+      lastStage = st;
+    });
+    bus.on('itemGained', ({ item, source }) => { if ((source === 'kill' || source === 'boss') && item && item.grade >= 2) snd.play('coin'); }); // 희귀 이상 드롭
     bus.on('bossDefeated', () => snd.play('bossDown'));
     bus.on('bossRecord', () => snd.play('coin'));
     bus.on('promote', () => snd.play('promote'));

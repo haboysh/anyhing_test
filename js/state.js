@@ -44,6 +44,7 @@
       stamps: 0, stampShop: { day: null, bought: 0 }, // 결재 도장
       // v4: 부서 장악 묶음 (서버 모드에선 서버 기록의 복사본)
       dept: G.Depts.fresh(), pass: 0, kaltoe: 0, namecard: 0, // 출입증, 칼퇴권, 명함
+      petticket: 0, pethero: 0, starter: false, // 반려 뽑기권, 영웅 이상 반려 뽑기권, 첫 결제 패키지 산 적 있는지 (서버 모드면 서버 지갑 복사본)
       skills: G.Skills.fresh(), // 업무 스킬 (보유·숙련·칸·쿨타임, 이직해도 유지)
       // v5 (docs/impl-spec-m4.md 0-4절): 튜토리얼·게시판·인맥·반려. 이직해도 유지
       tut: tutFresh(), // step = 받은 포스트잇 단계 수(서버 모드에선 서버 기록 복사본), intro = 입사 첫날 안내 끝, seen = 본 사수 한마디 키
@@ -198,7 +199,8 @@
     s.stamps = int(raw.stamps, 0);
     // ----- v4 필드 -----
     s.dept = G.Depts.clean(raw.dept, Date.now());
-    for (const k of ['pass', 'kaltoe', 'namecard']) s[k] = int(raw[k], 0);
+    for (const k of ['pass', 'kaltoe', 'namecard', 'petticket', 'pethero']) s[k] = int(raw[k], 0);
+    s.starter = raw.starter === true;
     const ss = obj(raw.stampShop) || {};
     s.stampShop = { day: typeof ss.day === 'number' ? ss.day : null, bought: int(ss.bought, 0) };
     s.skills = G.Skills.clean(raw.skills, s.maxStage);

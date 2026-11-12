@@ -116,25 +116,45 @@
   // 업무 스킬은 가방을 안 씀: 등급 → 스킬 키 → st.skills 보유에 더함 (서버 모드면 meta_states.skill). 그 등급이 전부 만렙이면 짬
   // 반려도 가방을 안 씀: 등급 → 반려·단계(pets.js) → st.pet.own 개수에 더함 (서버 모드면 meta_states.pet, 명세 ④ 31절)
   const GACHA_KIND = { acc: 'accessory', equip: 'equip', skill: 'skill', pet: 'pet' };
-  function gacha(st, h0, n, kind, floor) {
+  // pay = 'ticket': 반려 뽑기권 n장으로 (성과급 대신, 반려 뽑기만)
+  //   pay = 'hero': 영웅 이상 반려 뽑기권 1장 = 반려 1마리, 영웅 이상만 (그 안의 비율은 지금 레벨 확률표 그대로, gacha.js pullAtLeast).
+  //   뽑기 상태(횟수·확률업·천장)는 안 바꿈 — 확률표대로 뽑은 게 아니라서. (meta.js STARTER. 서버 모드면 petticket·pethero는 서버 지갑, 동시 요청은 inv_rev로 하나씩)
+  const cnt = (v) => (Number.isInteger(v) && v > 0 ? v : 0);
+  function gacha(st, h0, n, kind, floor, pay) {
     const h = hooks(h0);
     if (!GACHA_KIND[kind]) return no('없는 뽑기예요');
-    const cost = G.Gacha.costFor(n);
-    if (cost === null) return no('없는 뽑기 횟수예요');
+    const price = G.Gacha.costFor(n);
+    if (price === null) return no('없는 뽑기 횟수예요');
+    const ticket = pay === 'ticket';
+    const hero = pay === 'hero';
+    if (pay !== undefined && pay !== 'bonus' && !ticket && !hero) return no('없는 결제 방법이에요');
     const isSkill = kind === 'skill';
     const isPet = kind === 'pet';
+    if ((ticket || hero) && !isPet) return no('뽑기권은 반려 뽑기에만 써요');
+    if (hero && n !== 1) return no('영웅 이상 뽑기권은 1장씩 써요');
     if (isPet && !G.Pets.isOpen(st.maxStage)) return no(`반려는 최고 ${G.Pets.CFG.unlock}층에서 열려요`);
     if (!isSkill && !isPet && bagFree(st) < n) return no(`가방 공간이 부족해요 (${n}칸 필요)`);
-    if (st.bonus < cost) return no('성과급이 부족해요');
-    st.bonus -= cost;
+    const cost = ticket || hero ? 0 : price;
+    if (hero) {
+      if (cnt(st.pethero) < 1) return no('영웅 이상 뽑기권이 없어요');
+      st.pethero = cnt(st.pethero) - 1;
+    } else if (ticket) {
+      if (cnt(st.petticket) < n) return no('반려 뽑기권이 부족해요');
+      st.petticket = cnt(st.petticket) - n;
+    } else {
+      if (st.bonus < cost) return no('성과급이 부족해요');
+      st.bonus -= cost;
+    }
     const gs = st.gacha[kind] || G.Gacha.fresh();
     const start = G.Gacha.pullMany(gs, h.rng, 0).state.count;
-    const r = G.Gacha.pullMany(gs, h.rng, n, G.Gacha.configFor(kind));
-    st.gacha[kind] = r.state;
+    const c = G.Gacha.configFor(kind);
+    const r = hero ? { results: [{ ...G.Gacha.pullAtLeast(gs, h.rng, G.Meta.STARTER.heroMin, c), hero: true }], state: gs }
+      : G.Gacha.pullMany(gs, h.rng, n, c);
+    if (!hero) st.gacha[kind] = r.state;
     const results = isPet
       ? r.results.map((res, i) => {
         const got = G.Pets.pullOne(st, h, res.grade);
-        return { ...res, ...got, slot: 'pet', type: G.Pets.codexKey(got.pet, got.tier), pullNo: start + i + 1 };
+        return { ...res, ...got, slot: 'pet', type: G.Pets.codexKey(got.pet, got.tier), pullNo: hero ? start : start + i + 1 };
       })
       : isSkill
       ? r.results.map((res, i) => {
@@ -149,7 +169,7 @@
     // 업적·미션 기록(뽑은 수·연속 일반)은 기기 엔진이 결과를 보고 셈
     h.emit('gacha', { results, kind });
     h.emit('save');
-    return ok({ results, cost, kind });
+    return ok({ results, cost, kind, ...(ticket || hero ? { pay } : {}) });
   }
 
   // ----- 감정 -----

@@ -118,6 +118,7 @@
 
     // ----- 업데이트 내역 -----
     function updatesHtml() {
+      if (!B.UPDATES.length) return '<div class="empty-note">아직 업데이트 내역이 없어요. 출시 후부터 여기에 적어요.</div>';
       let ratesShown = false;
       return `<ol class="bd-log">${B.UPDATES.map((u) => {
         const rv = u.rates && !ratesShown ? (ratesShown = true, `<small>확률표 ${R.version()}</small>`) : '';
@@ -197,6 +198,7 @@
       Y.guideClaim().then((r) => {
         claiming = false;
         if (!r.ok) { c.toast(r.reason); return; }
+        if (c.snd) c.snd('ding');
         c.toast(`포스트잇 완료 · 성과급 +${fmt(r.bonus)}${r.pass ? ` · 출입증 +${r.pass}` : ''}`);
         const el = $('postit');
         if (!reduced() && E.fxOn('fx')) { el.classList.remove('peel'); void el.offsetWidth; el.classList.add('peel'); setTimeout(() => el.classList.remove('peel'), 520); }

@@ -20,6 +20,10 @@
     monthlyKrw: 5500,
     bonus: (sub, monthly) => (sub ? PASS.subDaily : 0) + (monthly ? PASS.monthlyDaily : 0),
   };
+  // 첫 결제 패키지 (사용자 확정 2026-11-10, 같은 날 바꿈): ₩5,500 계정당 1회 = 반려 뽑기권 150장 + 영웅 이상 반려 뽑기권 1장
+  // 반려 뽑기권 1장 = 반려 뽑기 1회 (성과급 100어치 → 150장 = 15,000 = 같은 값 법카 5,000의 300%). 영웅 이상 뽑기권 1장 = 반려 1마리, heroMin(영웅) 이상만
+  // 둘 다 반려 뽑기에만 씀, 얻는 곳은 이 패키지뿐. 서버 상품 id = logic.js PRODUCTS starter_pet
+  const STARTER = { id: 'starter_pet', krw: 5500, tickets: 150, hero: 1, heroMin: 3, valuePct: 300 };
   const ATT = {
     days: 30,
     maxFills: 5,
@@ -247,7 +251,7 @@
   G.Meta = {
     dayNum, weekNum, monthKey,
     GUIDE, guideDef, guideProgress, guideServerCheck,
-    ATT, PASS, attFresh, attSync, attStatus, attClaim, attFill,
+    ATT, PASS, STARTER, attFresh, attSync, attStatus, attClaim, attFill,
     MIS, misFresh, misSync, misTrack, misStatus, misClaim,
     TOWER, towerFresh, towerSync, towerFloorReward, towerBuffs,
   };
