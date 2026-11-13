@@ -139,7 +139,24 @@
       reject: (t) => { tone(t, { type: 'square', f: 220, dur: 0.15, vol: 0.07 }); return tone(t + 0.18, { type: 'square', f: 165, dur: 0.3, vol: 0.07 }); },
     };
 
+    // 배터리: 15초 동안 소리가 없으면 소리 장치를 재움(저전력 모드·조용한 화면). 다음 소리 때 깨워서 냄
+    const NAP_MS = 15000;
+    let napped = false;
+    let napTimer = null;
+    function napLater() {
+      clearTimeout(napTimer);
+      napTimer = setTimeout(() => { if (ctx && ctx.state === 'running') { napped = true; ctx.suspend().catch(() => {}); } }, NAP_MS);
+      if (napTimer && napTimer.unref) napTimer.unref();
+    }
     function play(name) {
+      if (napped && ctx && ctx.state === 'suspended') {
+        const r0 = RULE[name] || {};
+        if (prefs.on && RECIPE[name] && !(W.document && W.document.hidden) && !(isLowPower() && !r0.imp)) {
+          napped = false;
+          ctx.resume().then(() => play(name)).catch(() => { napped = true; });
+        }
+        return false;
+      }
       if (!prefs.on || !ctx || ctx.state !== 'running' || !RECIPE[name]) return false;
       if (W.document && W.document.hidden) return false;
       const r = RULE[name] || { gap: 0.05, max: 2 };
@@ -153,6 +170,7 @@
         live[name] = (live[name] || 0) + 1;
         node.onended = () => { live[name] = Math.max(0, (live[name] || 1) - 1); };
       } catch (e) { return false; }
+      napLater();
       return true;
     }
 
