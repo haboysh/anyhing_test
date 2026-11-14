@@ -9,9 +9,9 @@
     const T = G.GuideText;
     const R = G.Rates;
     const B = G.Board;
-    const GN = G.Items.GRADES.map((g) => g.name);
     const esc = (s) => String(s).replace(/[&<>"']/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
-    const reduced = () => window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const RM = window.matchMedia ? window.matchMedia('(prefers-reduced-motion: reduce)') : null;
+    const reduced = () => !!(RM && RM.matches);
     const modalOpen = () => $('modal').classList.contains('show');
 
     // ================= 사내 게시판 =================

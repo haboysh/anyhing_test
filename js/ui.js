@@ -43,6 +43,9 @@
     const setHtml = (el, h) => { if (el && el._h !== h) { el._h = h; el.innerHTML = h; } };
     const setDis = (el, d) => { if (el && el.disabled !== d) el.disabled = d; };
     const setStyle = (el, k, v) => { if (el && el.style[k] !== v) el.style[k] = v; };
+    // 움직임 줄이기 설정: 공격·맞을 때마다 새로 만들지 않고 하나를 계속 씀 (.matches는 설정이 바뀌면 같이 바뀜)
+    const RM = window.matchMedia ? window.matchMedia('(prefers-reduced-motion: reduce)') : null;
+    const reducedMotion = () => !!(RM && RM.matches);
     let tab = 'grow';
     let hitTimer;
     let toastTimer;
@@ -97,7 +100,7 @@
     function heroAttack(crit) {
       const now = performance.now();
       if (!$("player").classList.contains("art") || now < poseLock) return;
-      if (window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+      if (reducedMotion()) return;
       poseTimers.forEach(clearTimeout);
       const m = $("wpn-mouse");
       const later = (ms, fn) => poseTimers.push(setTimeout(fn, ms));
@@ -124,7 +127,7 @@
     // 적에게 맞음 (엔진 'hurt': 일정 간격마다 피해를 한 번에): 적이 내 쪽으로 기울고, 주인공이 밀리며 빨갛게 번쩍, 피해 숫자
     function onHurt({ dmg }) {
       hpGhost.hold();
-      if (document.hidden || !E.fxOn('fx') || (window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches)) return;
+      if (document.hidden || !E.fxOn('fx') || reducedMotion()) return;
       $('enemy').animate([{ translate: '0 0', rotate: '0deg' }, { translate: '-16px 2px', rotate: '-10deg', offset: 0.25 }, { translate: '0 0', rotate: '0deg' }],
         { duration: 320, easing: 'ease-out' });
       $('rig').animate([{ translate: '0 0' }, { translate: '-6px 0', offset: 0.3 }, { translate: '0 0' }], { duration: 260, easing: 'ease-out' });
@@ -144,6 +147,7 @@
             const pct = parseFloat($(fillId).style.width) || 0;
             g.style.transition = 'width .55s ease-out';
             g.style.width = pct + '%';
+            g._w = pct + '%'; // 같은 값이면 follow가 안 건드림 → 0.55초 내려오기가 0.1초 만에 끊기지 않음 (다른 값이면 'none'으로 바로 따라감)
             pct0 = pct;
           }, 320);
         },
@@ -151,8 +155,12 @@
           if (pct < pct0) return; // 맞은 직후: 잔상이 위에 남아 있음
           pct0 = pct;
           const g = $(ghostId);
+          // 같은 값이면 안 씀 (0.1초마다 불려서 체력이 그대로여도 매번 변경으로 처리됐음)
+          const w = pct + '%';
+          if (g._w === w) return;
+          g._w = w;
           g.style.transition = 'none';
-          g.style.width = pct + '%';
+          g.style.width = w;
         },
         reset() { clearTimeout(timer); pct0 = 0; },
       };
@@ -162,9 +170,15 @@
 
     function setSprite(el, key, scale) {
       const s = SP.spriteURL(key);
-      el.src = s.url;
-      el.width = s.w * scale;
-      el.height = s.h * scale;
+      // 같은 그림·크기면 다시 쓰지 않음 (적 줄은 적이 나올 때마다 3칸을 다시 그려 같은 값도 매번 변경으로 처리됐음).
+      // 주인공은 heroPose가 src를 직접 바꾸므로 src도 같을 때만 건너뜀
+      const sig = s.url + '|' + s.w * scale + '|' + s.h * scale;
+      if (el._spr !== sig || el.getAttribute('src') !== s.url) {
+        el._spr = sig;
+        el.src = s.url;
+        el.width = s.w * scale;
+        el.height = s.h * scale;
+      }
       el.classList.toggle("smooth", !!s.smooth);
       el.classList.toggle("art", !!s.art);
       el.classList.toggle("tired", key === "playerTired" && !!s.art);
@@ -217,7 +231,7 @@
     // 결재 도장 연출: 큰 성공 순간(강화 성공·이직 합격·장악 승리)에 빨간 인주 도장이 쾅 (0.5초, 효과 끄기·동작 줄이기 존중)
     function approveStamp(label) {
       snd('stamp'); // 소리는 연출을 꺼도 남
-      if (document.hidden || !E.fxOn('fx') || (window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches)) return;
+      if (document.hidden || !E.fxOn('fx') || reducedMotion()) return;
       const old = document.querySelector('.approve-stamp');
       if (old) old.remove();
       const el = document.createElement('div');
@@ -405,13 +419,16 @@
       const h = new Date().getHours();
       mentorSay(h >= 23 || h < 5 ? 'night' : 'normal');
     });
-    bus.on('promote', ({ rank }) => setTimeout(() => mentorSay('record', { rank }), 1900));
-    bus.on('bossRecord', ({ floor }) => setTimeout(() => mentorSay('record', { floor }), 1900));
+    // 1.9초 뒤 한마디 (토스트 다음). 같은 층에서 경력 안내(career)가 나오면 기록 축하가 덮지 않게 career 우선
+    let careerSayAt = -1e9;
+    const sayLater = (kind, vars) => setTimeout(() => { if (kind === 'career' || performance.now() - careerSayAt > 2500) mentorSay(kind, vars); }, 1900);
+    bus.on('promote', ({ rank }) => sayLater('record', { rank }));
+    bus.on('bossRecord', ({ floor }) => sayLater('record', { floor }));
     bus.on('promote', ({ rank }) => toast(`${rank}(으)로 승진!`));
     bus.on('fail', ({ reason, retreated }) => {
       setSprite($('player'), 'playerTired', 3);
       toast(FAIL_MSG[reason === 'burnout' && !retreated ? 'burnoutKeep' : reason] || '실패!');
-      if (reason === 'burnout') setTimeout(() => mentorSay('burnout'), 1900);
+      if (reason === 'burnout') sayLater('burnout');
     });
     bus.on('unlock', ({ key, name }) => (GU ? GU.unlockCard(key, name) : toast(`${name} 해금!`)));
     bus.on('probationFail', () => {
@@ -419,7 +436,7 @@
       renderPanel();
     });
     bus.on('probationClear', ({ floor, short }) => { toast(short ? `${floor}층 돌파 — 수습 통과! 경력은 ${E.careerNeedStage()}층부터 받아요` : `${floor}층 돌파 — 수습 통과! 이 회사 경력 다시 쌓여요`); renderPanel(); });
-    bus.on('careerReady', ({ floor }) => { toast(`${floor}층 도달 — 이제 이직하면 경력 +${fmt(E.careerGain())}점`); renderPanel(); });
+    bus.on('careerReady', ({ floor }) => { toast(`${floor}층 도달 — 이제 이직하면 경력 +${fmt(E.careerGain())}점`); careerSayAt = performance.now(); sayLater('career'); renderPanel(); });
     bus.on('bossRecord', ({ floor, bonus }) => toast(`신기록 보스! ${floor}층 · 성과급 +${bonus}개`));
     // 정식판: 서버가 처치를 인정하지 않아 층을 서버 기록으로 맞춤 (조작·끊김)
     bus.on('progressFixed', ({ stage }) => toast(`서버 기록으로 맞췄어요 (${stage}층)`));
@@ -577,12 +594,14 @@
     }
 
     // ----- 아래 패널 (성장 / 이직 / 정보) -----
-    function renderPanel() {
+    // auto: 아이템이 바뀌어 0.5초마다 다시 그릴 때 — 내용이 그대로면 DOM을 건드리지 않음
+    // (성장·이직·스킬 탭은 처치 드롭으로 바뀌는 게 없는데 가방이 바뀔 때마다 통째로 다시 만들었음)
+    function renderPanel(auto = false) {
       const S = E.S;
-      document.querySelectorAll('.tab').forEach((t) => t.classList.toggle('active', t.dataset.tab === tab));
       const body = $('panel-body');
+      let html;
       if (tab === 'grow') {
-        body.innerHTML = `
+        html = `
           ${Object.keys(UPGRADES).map((k) => `
             <div class="row ${E.upgradeLocked(k) ? 'locked' : ''}">
               <div class="icon">${UP_IMG[k] ? `<img class="up-img" src="${UP_IMG[k]}" width="42" height="42" alt="">` : SP.spriteImg('icon:' + k, 3)}</div>
@@ -595,7 +614,7 @@
       } else if (tab === 'quit') {
         const gain = E.careerGain();
         const block = E.applyBlock();
-        body.innerHTML = `
+        html = `
           <div class="quit-box resign">
             <div class="rs-head"><b>사직서</b><span>${E.companyName()} 귀중</span></div>
             <dl class="rs-form">
@@ -605,6 +624,7 @@
               <div><dt>보유 경력</dt><dd class="pen">${fmt(S.career)}점</dd></div>
             </dl>
             <p class="rs-note">다른 회사에 지원해서 합격하면 이직! 처음부터 다시 시작하지만 <b>경력</b>으로 아래 특전을 영구 강화해요</p>
+            <p class="rs-note"><b>평생 최고 층에 닿으면 바로 이직</b>하는 게 가장 빨리 커요</p>
             ${E.probationFailed() ? `<div class="rs-flag">${ICON.warn} 수습 탈락 중 · ${E.S.runStart + E.PROBATION.floors}층까지 올라가면 수습 통과</div>` : ''}
             ${E.careerHint() ? `<div class="rs-flag">${ICON.warn} ${E.careerHint()}</div>` : ''}
             <button class="quit-btn" id="btn-quit" ${block ? 'disabled' : ''}>
@@ -628,18 +648,20 @@
           }).join('')}
           <div class="small center">이직 1회 이상 시 스킬 자동 사용 해금</div>`;
       } else if (tab === 'equip') {
-        body.innerHTML = equipTab();
+        html = equipTab();
       } else if (tab === 'gacha') {
-        body.innerHTML = gachaTab();
+        html = gachaTab();
       } else if (tab === 'skill') {
-        body.innerHTML = skillTab();
+        html = skillTab();
       } else {
         tab = 'office';
-        body.innerHTML = officeTab();
+        html = officeTab();
       }
       document.querySelectorAll('.tab').forEach((t) => t.classList.toggle('active', t.dataset.tab === tab));
       const tip = GU && GU.tabTip(tab); // 탭 첫 방문: 사수 말풍선
-      if (tip) body.insertAdjacentHTML('afterbegin', tip);
+      const full = (tip || '') + html;
+      if (!auto || body._h !== full) body.innerHTML = full;
+      body._h = full;
       dirty = false;
       renderPanelLive();
       if (toolMode) renderTool();
@@ -1806,6 +1828,7 @@
       return info.list.some((x) => x.full) || info.meetings.some((m) => !m.done);
     };
     let deptBusy = false;
+    const dgPick = {}; // 특근 부서별로 고른 도전 단계 (이 화면에서만 기억)
     function showDept() {
       const S = E.S;
       const info = E.deptInfo(hooks.isSubscribed());
@@ -1835,12 +1858,27 @@
           <button class="act-btn" data-dp="quick" data-id="${m.id}" ${!m.won || m.done || S.kaltoe < 1 || lock ? 'disabled' : ''}>바로 처리 · 칼퇴권 1</button></div></div>`).join('');
         const dg = E.dungeonInfo().map((d) => {
           const most = Math.min(S.pass, S.kaltoe, DN.CFG.dungeon.sweepMax);
-          const rw = d.best ? `보상 ${gainText(d.reward.goldHours ? { gold: E.deptGold({ goldHours: d.reward.goldHours }) } : d.reward.equip ? { items: { length: d.reward.equip } } : d.reward)} (${d.best}단계 기준)` : '1단계부터 도전해요';
+          // 도전 단계 고르기: 기본은 지금 회차 힘으로 이길 만한 단계 (적 층 ≤ 이번 회차 유효 최고), 사용자 2026-11-14
+          // 추천은 층만 봄 (출입증·가방이 모자라도 추천 단계는 그대로). 1단계도 어려우면 추천 없음
+          const floorOf = (k) => DN.stepFloor(d.id, k);
+          const canFloor = Math.min(E.effRunMax(), S.maxStage + DN.CFG.dungeon.floorMargin);
+          let rec = 0;
+          for (let k = d.next; k >= 1; k--) if (floorOf(k) <= canFloor) { rec = k; break; }
+          const pick = Math.max(1, Math.min(d.next, dgPick[d.id] || rec));
+          const pickErr = DN.dungeonError(S, d.id, pick, S.maxStage);
+          const hard = !pickErr && floorOf(pick) > E.effRunMax();
+          const rwOf = (r) => gainText(r.goldHours ? { gold: E.deptGold({ goldHours: r.goldHours }) } : r.equip ? { items: { length: r.equip } } : r);
+          const rw = `${pick}단계 보상 ${rwOf(DN.stepReward(d.id, pick))}${d.best ? ` · 소탕은 최고 ${d.best}단계 보상` : ''}`;
+          const stepBtn = (k, sign, label, off) => `<button class="act-btn" data-dp="dgstep" data-id="${d.id}" data-k="${k}" ${off ? 'disabled' : ''} aria-label="${label}">${sign}</button>`;
+          const stepRow = `<div class="dg-step">${stepBtn(pick - 1, '−', '한 단계 아래', pick <= 1)}
+            <span><b>${pick}단계</b> · ${floorOf(pick)}층 ${pick === rec ? '<em class="ok">추천</em>' : hard ? '<em class="over">지금은 어려워요</em>' : ''}</span>
+            ${stepBtn(pick + 1, '+', '한 단계 위', pick >= d.next)}</div>`;
           return `<div class="dp-card"><div class="dp-title"><b>${d.name}</b> · 최고 ${d.best}단계</div><div class="small">${rw}</div>
-            <div class="act-row dp-3"><button class="act-btn gold-btn" data-dp="dungeon" data-id="${d.id}" data-k="${d.next}" ${d.error || lock ? 'disabled' : ''}>${d.next}단계 도전</button>
+            ${stepRow}
+            <div class="act-row dp-3"><button class="act-btn gold-btn" data-dp="dungeon" data-id="${d.id}" data-k="${pick}" ${pickErr || lock ? 'disabled' : ''}>${pick}단계 도전</button>
             <button class="act-btn" data-dp="sweep" data-id="${d.id}" data-n="1" ${d.best < 1 || most < 1 || lock ? 'disabled' : ''}>소탕 1회</button>
             <button class="act-btn" data-dp="sweep" data-id="${d.id}" data-n="${Math.max(1, most)}" ${d.best < 1 || most < 2 || lock ? 'disabled' : ''}>소탕 ${Math.max(2, most)}회</button></div>
-            ${d.error ? `<div class="small">${d.error}</div>` : ''}</div>`;
+            ${pickErr ? `<div class="small">${pickErr}</div>` : ''}</div>`;
         }).join('');
         body = `<div class="sub-title">부서 생산 <small>최대 ${info.cap}시간</small></div><div class="dp-table">${prod}</div>
           <button class="act-btn gold-btn wide" data-dp="claim" ${anyProd && !lock ? '' : 'disabled'}>모두 받기</button>
@@ -1864,6 +1902,7 @@
       if (a === 'conquer') return start(E.conquestStart());
       if (a === 'meet') return start(E.meetingStart(id));
       if (a === 'dungeon') return start(E.dungeonStart(id, Number(t.dataset.k)));
+      if (a === 'dgstep') { dgPick[id] = Number(t.dataset.k); showDept(); return; } // 범위는 showDept가 1~다음 단계로 맞춤
       const done = (msg) => (r) => { deptBusy = false; toast(r.ok ? msg(r) : r.reason); reshow('부서 장악', showDept, true); renderHud(); };
       // 소탕은 출입증·칼퇴권이 같이 빠지니 한 번 확인 (사용자 2026-11-10)
       if (a === 'sweep') {
@@ -2520,6 +2559,7 @@
     $('si-ach').addEventListener('click', () => showAchievements());
     $('si-set').addEventListener('click', () => showSettings());
     function renderSideDots() {
+      if (document.hidden) return; // 앱을 내린 동안은 안 그림 (돌아오면 1초 안에 다시 그림)
       $('si-ach').classList.toggle('has-dot', E.achievements().some((a) => a.ready));
       $('si-mis').classList.toggle('locked', !E.isUnlocked('mission'));
     }
@@ -2572,7 +2612,7 @@
         GU.tick();
         // 처치 드롭 등으로 바뀐 아래 패널: 가방이 크면 통째로 다시 그리는 게 비쌈 → 0.5초(저전력 2초)에 한 번만
         const now = performance.now();
-        if (dirty && now - lastDirtyRender >= (E.S.settings.lowPower ? 2000 : 500)) { lastDirtyRender = now; renderPanel(); if (detailId !== null) renderSheet(); }
+        if (dirty && now - lastDirtyRender >= (E.S.settings.lowPower ? 2000 : 500)) { lastDirtyRender = now; renderPanel(true); if (detailId !== null) renderSheet(); }
         renderPanelLive();
       },
     };

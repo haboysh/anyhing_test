@@ -1554,7 +1554,7 @@
       meetings: D.meetingInfo(E.S, now()), pass: E.S.pass, kaltoe: E.S.kaltoe, namecard: E.S.namecard, passShopLeft: D.passShopLeft(E.S, now()) });
     E.dungeonInfo = () => Object.keys(E.S.dept.owned).map((id) => {
       const best = E.S.dept.dungeon.best[id] || 0;
-      return { id, name: D.BY_ID[id].dungeon.name, best, next: best + 1, error: D.dungeonError(E.S, id, best + 1, E.S.maxStage), reward: D.stepReward(id, Math.max(1, best)) };
+      return { id, name: D.BY_ID[id].dungeon.name, best, next: best + 1 };
     });
     function sideStart(kind, args, err) {
       if (err) return no(err);

@@ -55,7 +55,7 @@ button:active { transform: translateY(2px); }
 
 /* 도트 글꼴: 제목·숫자·버튼 */
 .tab, .cur b, #rank, #stage, .row .name, .buy, .act-btn, #modal-ok, .modal-box h3, .it-name, .label, .bar span, #btn-advance, .mini,
-.quit-btn, .sub-btn, .gacha-title, .chip-btn, .career b, .float { font-family: 'Galmuri11', 'Pretendard', sans-serif; letter-spacing: 0; }
+.quit-btn, .sub-btn, .chip-btn, .career b, .float { font-family: 'Galmuri11', 'Pretendard', sans-serif; letter-spacing: 0; }
 
 /* ----- 위: 재화 줄 (계산기 액정 칸) ----- */
 .cur { background: #121715; border: 1px solid #333c38; border-radius: 3px; }
@@ -133,7 +133,7 @@ button:active { transform: translateY(2px); }
 .act-btn:disabled { opacity: .45; box-shadow: none; }
 .danger { border-radius: 6px; background: #fff; color: var(--stamp); border: 2px solid var(--stamp); }
 
-.stat-line, .prog, .rate-table, .bonus-box, .dev-box, .acct-box, .dp-card, .eq-slots { background: var(--paper-hi); border: 2px solid var(--ink); border-radius: 4px; }
+.stat-line, .prog, .bonus-box, .dev-box, .acct-box, .dp-card, .eq-slots { background: var(--paper-hi); border: 2px solid var(--ink); border-radius: 4px; }
 .quit-box, .gacha-box, .sub-box { background: var(--paper-hi); border: 2px solid var(--ink); border-radius: 4px; box-shadow: 0 2px 0 var(--ink); }
 .chip { border-radius: 4px; background: var(--paper-hi); border: 2px solid var(--ink); color: var(--ink-sub); }
 .chip-btn { border-radius: 4px; background: #fff; border: 2px solid var(--ink); color: var(--ink); }
@@ -153,8 +153,6 @@ button:active { transform: translateY(2px); }
 .bn-row.zero b { color: #9aa1a6; }
 .career b { color: var(--pen); }
 .lv-fill { background: var(--pen); }
-.boost-fill { background: #d9a632; }
-.pity-fill { background: var(--stamp); }
 .bar.thin { border-width: 1px; height: 8px; }
 .cx-cell { background: rgba(0, 0, 0, .05); border-color: var(--rule); color: var(--ink); }
 .it-badges i { background: #d7dbd6; color: var(--ink); }
@@ -285,8 +283,6 @@ button:focus-visible, .cur:focus-visible { outline: 3px solid var(--hilite); out
 .tool-grid { max-height: 46vh; overflow-y: auto; margin: 8px 0; padding: 2px; }
 .tool-grid .bag-grid { grid-template-columns: repeat(6, 1fr); }
 .layer-box .stat-line { padding: 8px 10px; font-size: 13px; }
-.act-row.wrap { flex-wrap: wrap; }
-.act-row.wrap .act-btn { flex: 1 1 40%; }
 .sk-tickets { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin-bottom: 8px; font-size: 12px; }
 .sk-tickets > span { color: var(--ink-sub); margin-right: 2px; }
 .sk-tickets .chip { min-height: 32px; padding: 4px 8px; }
@@ -407,6 +403,12 @@ button.wa-row { cursor: pointer; }
 .dp-row span { font-family: 'Galmuri11', sans-serif; }
 .dp-row em { opacity: 1; color: var(--ink-sub); font-size: 11px; text-align: right; }
 #modal-body .dp-row b.full { justify-self: start; padding: 0 4px; color: var(--ink); background: var(--hilite); }
+.dg-step { display: grid; grid-template-columns: 44px 1fr 44px; align-items: center; gap: 6px; margin-top: 6px; }
+.dg-step .act-btn { min-height: 44px; padding: 0; font-size: 18px; }
+.dg-step span { text-align: center; font-size: 13px; }
+.dg-step em { font-style: normal; font-size: 12px; margin-left: 2px; }
+.dg-step em.ok { color: var(--ok); }
+.dg-step em.over { color: var(--stamp); }
 .act-row.dp-3 { display: grid; grid-template-columns: 1.15fr 1fr 1fr; gap: 6px; }
 .act-row.dp-3 .act-btn { padding: 6px 2px; font-size: 13px; white-space: nowrap; word-break: keep-all; }
 

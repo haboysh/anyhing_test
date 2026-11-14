@@ -5,7 +5,6 @@
 // 재산(원)은 폰 재화 → 여기선 "몇 시간치/몇 마리치"만 돌려주고 폰 엔진이 원으로 바꿈
 (function (G) {
   'use strict';
-  const I = G.Items;
   const Inv = G.Inv;
   const dayNum = (t) => G.Meta.dayNum(t);
   const ok = (o = {}) => ({ ok: true, ...o });

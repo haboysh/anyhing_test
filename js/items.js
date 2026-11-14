@@ -245,7 +245,7 @@
     baseRate: 0.15,
     stepRate: 0.05, // 연속 실패 1회당
     maxRate: 0.5,
-    failJjam: 3,
+    failJjam: 2, // 2026-11-13 사용자 확정 (3 → 2, balance-check-2026-11-13 결정 1)
   };
 
   // ----- 9. 분해 -----

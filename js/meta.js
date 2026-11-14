@@ -140,7 +140,7 @@
     failsPerDay: 3,
     floorBonus: 100, monthCap: 12000, floorJjam: 2, floorStamps: 3,
     sweepRatio: 0.5,
-    // 역대 최고 10층마다 하나씩, 이 순서로 반복
+    // 역대 최고 10층마다 하나씩, 이 순서로 반복 (7종·값 사용자 확정 2026-11-14, balance-check-2026-11-13b)
     buffs: [
       { stat: 'atk', per: 1, cap: 20, name: '업무력' },
       { stat: 'hp', per: 1, cap: 20, name: '체력' },

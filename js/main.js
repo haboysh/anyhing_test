@@ -117,15 +117,21 @@
     let last = performance.now();
     let saveTimer = 0;
     let uiTimer = 0;
-    // 저전력 모드: 게임 계산 초당 약 15번(보통은 화면 주사율), 화면 숫자 갱신 0.5초마다(보통 0.1초), CSS 움직임 끔 (body.low-power)
-    const LOW_FRAME_MS = 66;
+    // 게임 계산 최대 초당 60번 (120Hz 폰도 60, 사용자 2026-11-14) · 저전력 모드는 초당 약 30번, 화면 숫자 갱신 0.5초마다(보통 0.1초), CSS 움직임 끔 (body.low-power)
+    const FRAME_MS = 1000 / 60;
+    let due = 0; // 다음 계산 예정 시각: 90Hz·120Hz 화면도 평균 초당 60번 (예정 시각보다 2ms 일찍까지 허용)
+    const LOW_FRAME_MS = 25; // 25ms 기다린 뒤 다음 화면 갱신(60Hz면 33ms 뒤) → 초당 약 30번
     const lowPower = () => engine.S.settings.lowPower === true;
     function next() {
       if (lowPower()) setTimeout(() => requestAnimationFrame(loop), LOW_FRAME_MS);
       else requestAnimationFrame(loop);
     }
     function loop(t) {
-      const dt = Math.min(0.25, (t - last) / 1000);
+      if (!lowPower()) {
+        if (t < due - 2) { requestAnimationFrame(loop); return; } // 90·120Hz 화면: 프레임 건너뜀
+        due = Math.max(due, t - FRAME_MS) + FRAME_MS;
+      }
+      const dt = Math.max(0, Math.min(0.25, (t - last) / 1000)); // 앱을 다시 열면 last가 이번 프레임 시각보다 뒤일 수 있음 → 음수 막음
       last = t;
       document.body.classList.toggle('low-power', lowPower());
       if (requireOnline && netOk && cloud.status === 'offline') setNet(false);

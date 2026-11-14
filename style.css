@@ -237,7 +237,6 @@ button:active { transform: translateY(2px) scale(.98); }
 .it-icon { position: relative; width: 100%; aspect-ratio: 1; border-radius: 12px; display: flex; align-items: center; justify-content: center;
   border: 2px solid var(--gc, rgba(255, 255, 255, .15)); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .18), 0 2px 6px rgba(0, 0, 0, .3); overflow: hidden; }
 .it-icon .g { font-size: 18px; font-weight: 900; text-shadow: var(--stroke); }
-.it-icon .tn { position: absolute; left: 4px; bottom: 2px; font-size: 9px; font-weight: 900; opacity: .75; }
 .it-icon .pl { position: absolute; right: 3px; top: 2px; font-size: 10px; font-weight: 900; color: var(--gold); text-shadow: var(--stroke); }
 .it-icon .q { position: absolute; left: 3px; top: 1px; font-size: 12px; font-weight: 900; color: #fff; background: rgba(0, 0, 0, .55); border-radius: 6px; padding: 0 4px; line-height: 15px; }
 .it-icon .lk { position: absolute; right: 2px; bottom: 1px; font-size: 9px; }
@@ -249,7 +248,6 @@ button:active { transform: translateY(2px) scale(.98); }
 .eq-slot { background: none; display: flex; flex-direction: column; align-items: center; gap: 4px; min-width: 0; }
 .eq-slot .it-icon { width: calc(100% - 4px); } /* 누르는 칸은 44px, 그림은 조금 작게 해서 칸 사이가 붙어 보이지 않게 */
 .eq-name { font-size: 10px; color: var(--sub); font-weight: 800; white-space: nowrap; }
-.eq-res { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-bottom: 8px; }
 .chip { padding: 6px 10px; border-radius: 999px; background: rgba(0, 0, 0, .3); border: 1px solid var(--card-line); font-size: 12px; color: var(--sub); font-weight: 700; }
 .chip b { color: var(--text); font-weight: 900; margin-left: 2px; }
 .chip-btn { margin-left: auto; padding: 7px 12px; border-radius: 999px; font-size: 12px; font-weight: 900; color: var(--sub); background: rgba(255, 255, 255, .08); }
@@ -367,24 +365,13 @@ b.subst { color: var(--gold2); }
 
 /* 뽑기 */
 .gacha-box { background: linear-gradient(160deg, rgba(162, 89, 255, .28), rgba(255, 159, 28, .1)); border: 1px solid rgba(255, 255, 255, .1); border-radius: 20px; padding: 14px; margin-bottom: 10px; }
-.gacha-title { font-size: 18px; font-weight: 900; }
 .gacha-sub { font-size: 12px; color: var(--sub); margin: 3px 0 10px; font-weight: 600; }
 .pull-row { display: flex; gap: 8px; }
 .pull-btn { flex: 1; min-width: 0; }
 .prog { background: var(--card); border: 1px solid var(--card-line); border-radius: 18px; padding: 12px 14px; margin-bottom: 10px; }
-.prog-line { display: flex; justify-content: space-between; font-size: 12px; color: var(--sub); font-weight: 700; margin-top: 8px; }
-.prog-line:first-child { margin-top: 0; }
-.prog-line b { color: var(--text); font-weight: 900; }
-.prog-line b.hot { color: var(--gold); }
 .bar.thin { height: 8px; margin-top: 5px; }
 .bar.thin > div::after { display: none; }
 .lv-fill { background: linear-gradient(90deg, #3a8bff, var(--blue)); }
-.boost-fill { background: linear-gradient(90deg, var(--gold2), var(--gold)); }
-.pity-fill { background: linear-gradient(90deg, #c2334a, #ff4d4f); }
-.rate-table { background: var(--card); border: 1px solid var(--card-line); border-radius: 18px; padding: 8px 14px; margin-bottom: 10px; }
-.rt-row { display: grid; grid-template-columns: 1fr 1fr 1fr; font-size: 13px; font-weight: 800; padding: 4px 0; }
-.rt-row span:not(:first-child) { text-align: right; }
-.rt-row.head { font-size: 11px; color: var(--sub); }
 
 /* 정보 탭: 장비 보너스 */
 .bonus-box, .dev-box, .acct-box { background: var(--card); border: 1px solid var(--card-line); border-radius: 16px; padding: 12px 14px; }
@@ -412,7 +399,6 @@ b.subst { color: var(--gold2); }
 .bag-bar span { flex: 1; min-width: 0; }
 .bag-cell { position: relative; }
 .bag-cell .up { position: absolute; right: 2px; top: 1px; font-style: normal; font-size: 11px; color: #4ade80; text-shadow: 0 1px 2px #000; }
-.filter-row { margin-bottom: 8px; }
 .bag-dock { position: sticky; bottom: calc(-16px - env(safe-area-inset-bottom)); display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin: 10px -14px calc(-16px - env(safe-area-inset-bottom)); padding: 8px 10px calc(8px + env(safe-area-inset-bottom)); background: var(--bg); border-top: 1px solid var(--card-line); z-index: 3; }
 .bag-dock button { min-height: 44px; border-radius: 12px; font-size: 12px; font-weight: 800; background: var(--card); border: 1px solid var(--card-line); }
 .c-stamps { --dot: #e5484d; }
