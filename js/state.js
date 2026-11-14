@@ -250,7 +250,7 @@
     if (pa) { out.presetAlt = {}; for (const slot of I.SLOT_KEYS) out.presetAlt[slot] = Number.isInteger(pa[slot]) && pa[slot] > 0 ? pa[slot] : null; }
     if (r.preset === 0 || r.preset === 1) out.preset = r.preset;
     const sk = obj(r.skills);
-    if (sk && Array.isArray(sk.slots)) out.skills = { slots: sk.slots.slice(0, 8).map((k) => (typeof k === 'string' && G.Skills.BY_KEY[k] ? k : null)) };
+    if (sk && Array.isArray(sk.slots)) out.skills = { slots: sk.slots.slice(0, 8).map((k) => (typeof k === 'string' && Object.prototype.hasOwnProperty.call(G.Skills.BY_KEY, k) ? k : null)) };
     const pe = obj(r.pet);
     if (pe) out.pet = { out: typeof pe.out === 'string' && pe.out.length <= 32 ? pe.out : null };
     return out;

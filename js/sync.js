@@ -249,7 +249,9 @@
       })));
     }
     Y.skillLevelUp = (key) => (online ? skillAction('levelUp', { key }) : local(E.skillLevelUp(key)));
-    Y.skillLevelUpAll = () => (online ? skillAction('levelAll', {}) : local(E.skillLevelUpAll()));
+    // 숙련할 게 없으면 서버에 안 보냄 (예전엔 400 + 안내, 2026-11-14)
+    Y.skillLevelUpAll = () => (!online ? local(E.skillLevelUpAll())
+      : E.skillInfo().list.some((s) => s.canLevel) ? skillAction('levelAll', {}) : Promise.resolve({ ok: false, reason: '숙련할 수 있는 스킬이 없어요' }));
     Y.skillExchange = (key) => (online ? skillAction('exchange', { key }) : local(E.skillExchange(key)));
     Y.skillEquip = (key, i) => local(E.skillEquip(key, i));
     Y.skillUnequip = (i) => local(E.skillUnequip(i));

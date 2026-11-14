@@ -314,7 +314,7 @@
   // 잠재 한 줄 (잘못되면 null)
   function cleanPotential(p) {
     if (p && p.stat === 'mental') p = { ...p, stat: 'hp' }; // v2 → v3 이름 변경
-    if (!p || typeof p !== 'object' || !(p.stat in I.STATS)) return null;
+    if (!p || typeof p !== 'object' || !Object.prototype.hasOwnProperty.call(I.STATS, p.stat)) return null; // 'constructor' 같은 이름 막음 (2026-11-14)
     if (typeof p.value !== 'number' || !isFinite(p.value)) return null;
     if (p.kind !== 'flat' && p.kind !== 'pct') return null;
     return { stat: p.stat, value: p.value, kind: p.kind, locked: p.locked === true };

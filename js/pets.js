@@ -71,7 +71,8 @@
   }
 
   const isOpen = (maxStage) => Number.isFinite(maxStage) && maxStage >= CFG.unlock;
-  const countsOf = (pet, key) => pet.own[key] || [0, 0, 0, 0];
+  // 자기 키만 ('constructor'·'toString' 같은 이름이 Object 함수를 꺼내 .some에서 멈추지 않게, 2026-11-14)
+  const countsOf = (pet, key) => (Object.prototype.hasOwnProperty.call(pet.own, key) && Array.isArray(pet.own[key]) ? pet.own[key] : [0, 0, 0, 0]);
   const owned = (pet, key) => countsOf(pet, key).some((x) => x > 0);
   // 가장 높은 단계 (없으면 -1)
   function bestTier(pet, key) {

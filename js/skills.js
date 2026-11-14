@@ -61,13 +61,15 @@
     const used = new Set();
     for (let i = 0; i < CFG.slotFloors.length; i++) {
       const k = slots[i];
-      if (typeof k === 'string' && s.owned[k] && !used.has(k) && slotOpen(i, maxStage)) { s.slots[i] = k; used.add(k); }
+      if (typeof k === 'string' && Object.prototype.hasOwnProperty.call(s.owned, k) && !used.has(k) && slotOpen(i, maxStage)) { s.slots[i] = k; used.add(k); } // 'constructor' 같은 이름 막음
     }
     const cd = r.cd && typeof r.cd === 'object' ? r.cd : {};
-    for (const k of Object.keys(s.owned)) if (typeof cd[k] === 'number' && isFinite(cd[k]) && cd[k] > 0) s.cd[k] = Math.min(cd[k], BY_KEY[k].cd);
+    for (const k of Object.keys(s.owned)) if (typeof cd[k] === 'number' && isFinite(cd[k]) && cd[k] > 0) s.cd[k] = Math.min(cd[k], BY_KEY[k].cd * 2); // 회사 '스킬 쿨타임 증가'면 기본보다 김 (예전엔 기본값으로 잘림, 2026-11-14)
     const t = Array.isArray(r.tickets) ? r.tickets : [];
     s.tickets = s.tickets.map((_, g) => Math.min(9999, toInt(t[g])));
-    s.granted = r.granted === true || Object.keys(s.owned).length > 0; // 예전 세이브(granted 없음)는 보유가 있으면 받은 것
+    // 예전 세이브(granted 없음)는 보유가 있으면 받은 것. granted: false가 적혀 있으면 그대로
+    // (첫 지급 전에 뽑으면 다시 열 때 첫 지급을 건너뛰던 것, 2026-11-14)
+    s.granted = r.granted === true || (r.granted !== false && Object.keys(s.owned).length > 0);
     return s;
   }
   // 서버가 저장하는 부분 (보유·레벨·카드·교환권·첫 지급). 장착 칸·쿨타임은 폰

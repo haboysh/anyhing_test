@@ -415,7 +415,7 @@
     };
     E.skillEquip = function (key, i) {
       const sk = E.S.skills;
-      if (!sk.owned[key]) return no('없는 스킬이에요');
+      if (!Object.prototype.hasOwnProperty.call(sk.owned, key)) return no('없는 스킬이에요');
       if (!SK.slotOpen(i, E.S.maxStage)) return no(`최고 ${SK.CFG.slotFloors[i]}층부터 열려요`);
       const was = sk.slots.indexOf(key);
       if (was >= 0) sk.slots[was] = sk.slots[i]; // 이미 다른 칸에 있으면 자리 바꾸기
@@ -1130,7 +1130,7 @@
     };
 
     E.unequip = function (slot) {
-      if (!(slot in I.SLOTS)) return no('없는 부위예요');
+      if (!Object.prototype.hasOwnProperty.call(I.SLOTS, slot)) return no('없는 부위예요');
       const id = E.S.equipped[slot];
       if (id === null || id === undefined) return no('장착한 아이템이 없어요');
       E.S.equipped[slot] = null;
@@ -1482,7 +1482,11 @@
       return rw.box ? openGradeBox(rw.box) : null;
     }
     E.attendance = () => M.attStatus(E.S.att, now());
+    // 상자 보상 날(7·14·21·30일)인데 가방이 가득이면 받기 전에 막음 — 테스트판은 받은 걸로 표시되고 상자만 사라졌음 (서버는 bag_full로 막음, 2026-11-14)
+    const attBagBlock = (day, paid) => (!paid && day > 0 && M.ATT.reward(day).box && Inv.bagFree(E.S) <= 0 ? no('가방이 가득 찼어요 (상자 받을 1칸 필요)') : null);
     E.claimAttendance = function (bonusPaid = false) {
+      const block = attBagBlock(E.attendance().canClaim ? E.attendance().today : 0, bonusPaid);
+      if (block) return block;
       const r = M.attClaim(E.S.att, now());
       if (!r) return no('오늘은 이미 받았어요');
       const item = giveReward(r, bonusPaid);
@@ -1494,6 +1498,8 @@
     E.fillAttendance = function (day, paid = false) {
       const r = M.attFill(E.S.att, now(), day);
       if (typeof r === 'string') return no(r);
+      const block = attBagBlock(day, paid);
+      if (block) return block;
       if (!paid && E.S.corp < r.cost) return no('법카가 부족해요');
       if (!paid) E.S.corp -= r.cost;
       r.commit();
@@ -1730,14 +1736,22 @@
     E.towerInfo = function () {
       E.towerSync();
       const t = E.S.tower;
-      return { unlocked: E.isUnlocked('tower'), cur: t.cur, best: t.best, failsLeft: Math.max(0, M.TOWER.failsPerDay - t.fails),
+      return { unlocked: E.isUnlocked('tower'), cur: t.cur, best: t.best, failsLeft: Math.max(0, M.TOWER.failsPerDay - t.fails), limit: M.towerLimit(E.S.maxStage), limitNote: E.towerLimitNote(),
         bonusMonth: t.bonusMonth, bonusCap: M.TOWER.monthCap, buffs: E.towerBuffs(), active: E.mode === 'tower' };
+    };
+    // 서버 한도(meta.js towerGate, 평생 최고 층 기준)에 막힌 다음 층 안내. 막히지 않았으면 ''
+    //   (예전엔 한도 위 층까지 이겨서 층마다 서버 거절 400·요청 제한 429가 반복됨, 2026-11-14)
+    E.towerLimitNote = function () {
+      const next = E.S.tower.cur + 1;
+      if (!M.towerGate(next, E.S.maxStage)) return '';
+      return `지금은 타워 ${M.towerLimit(E.S.maxStage)}층까지예요 · 평생 최고 ${M.towerNeedMax(next)}층에 닿으면 더 올라가요`;
     };
     E.towerStart = function () {
       if (!E.isUnlocked('tower')) return no(`평생 최고 ${M.TOWER.unlock}층부터 열려요`);
       if (E.mode !== 'main') return no('이미 도전 중이에요');
       E.towerSync();
       if (E.S.tower.fails >= M.TOWER.failsPerDay) return no('오늘 도전 횟수를 다 썼어요');
+      if (E.towerLimitNote()) return no(E.towerLimitNote());
       E.mode = 'tower';
       E.tower = { floor: E.S.tower.cur + 1, timer: M.TOWER.time };
       E.restTimer = 0;
@@ -1776,6 +1790,11 @@
       E.spawnDelay = F.SPAWN_DELAY;
       emit('towerClear', { floor: n, ...reward });
       emit('save');
+      // 다음 층이 서버 한도 위면 실패 횟수 안 쓰고 도전 끝
+      if (M.towerGate(n + 1, E.S.maxStage)) {
+        emit('towerEnd', { floor: n + 1, reason: 'limit', cleared: E.S.tower.cur, note: E.towerLimitNote() });
+        E.towerExit();
+      }
     }
     function towerFail(reason) {
       E.S.tower.fails++;

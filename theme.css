@@ -137,6 +137,7 @@ button:active { transform: translateY(2px); }
 .quit-box, .gacha-box, .sub-box { background: var(--paper-hi); border: 2px solid var(--ink); border-radius: 4px; box-shadow: 0 2px 0 var(--ink); }
 .chip { border-radius: 4px; background: var(--paper-hi); border: 2px solid var(--ink); color: var(--ink-sub); }
 .chip-btn { border-radius: 4px; background: #fff; border: 2px solid var(--ink); color: var(--ink); }
+.chip-btn:not(.ready):disabled { color: #9aa1a6; border-color: #9aa1a6; border-style: dashed; }
 .eq-tools button, .bag-dock button { border-radius: 4px; background: #fff; border: 2px solid var(--ink); color: var(--ink); }
 .eq-tools button.on { color: var(--ok); border-color: var(--ok); }
 .bag-dock { background: var(--paper); border-top: 2px solid var(--ink); }

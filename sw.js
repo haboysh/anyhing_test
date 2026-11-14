@@ -1,5 +1,5 @@
 // 오프라인에서도 열리도록 캐시 (항상 최신 버전 우선)
-const CACHE = 'overtime-v31';
+const CACHE = 'overtime-v33';
 self.addEventListener('install', (e) => self.skipWaiting());
 // 예전 버전 캐시 지우기 (버전마다 그림·글꼴 전체가 따로 쌓여 폰 저장 공간을 계속 차지했음)
 self.addEventListener('activate', (e) => e.waitUntil(

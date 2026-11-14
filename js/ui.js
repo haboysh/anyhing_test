@@ -443,7 +443,7 @@
     bus.on('econFixed', () => toast('서버 기록으로 근로 강화·재산을 맞췄어요'));
     bus.on('achievement', ({ name }) => toast(`업적 달성: ${name} (위 업적 아이콘에서 받기)`));
     bus.on('towerClear', ({ floor, bonus }) => toast(`야근 타워 ${floor}층 돌파!${bonus ? ` 성과급 +${bonus}개` : ''}`));
-    bus.on('towerEnd', ({ floor, reason }) => { toast(`타워 ${floor}층 ${reason === 'deadline' ? '마감 초과' : '번아웃'} · 도전 끝`); renderPanel(); });
+    bus.on('towerEnd', ({ floor, reason, note }) => { toast(reason === 'limit' ? note : `타워 ${floor}층 ${reason === 'deadline' ? '마감 초과' : '번아웃'} · 도전 끝`); renderPanel(); });
     bus.on('towerSweep', ({ floors, bonus }) => toast(`새 달! 타워 ${floors}층까지 소탕 · 성과급 +${bonus}개`));
     bus.on('recover', () => setSprite($('player'), 'player', 3));
     // ----- 부서 장악: 별도 전투 알림 (docs/ui-spec.md 부서 장악 화면 4·5절) -----
@@ -735,7 +735,7 @@
         </div>`;
       }).join('');
       return `<div class="sk-head"><span>보유 효과 업무력 <b>+${info.holdPct.toFixed(1)}%</b></span>
-          <button class="chip-btn" data-act="sk-all">일괄 숙련</button><button class="chip-btn" data-act="sk-shop">스킬 뽑기</button></div>
+          <button class="chip-btn" data-act="sk-all" ${info.list.some((s) => s.canLevel) ? '' : 'disabled'}>일괄 숙련</button><button class="chip-btn" data-act="sk-shop">스킬 뽑기</button></div>
         ${info.tickets.some((t) => t > 0) ? `<div class="sk-tickets"><span>교환권</span>${info.tickets.map((t, g) => (t > 0 ? `<button class="chip ${exchangeGrade === g ? 'on' : ''}" data-skx="${g}" ${t >= G.Skills.CFG.ticketPieces ? '' : 'disabled'}>${GR[g].name} <b>${t}/${G.Skills.CFG.ticketPieces}</b></button>` : '')).join('')}</div>` : ''}
         ${exchangeGrade !== null ? `<div class="bag-bar"><span>${GR[exchangeGrade].name} 스킬 중 받고 싶은 걸 골라요 (조각 ${G.Skills.CFG.ticketPieces}개 사용)</span><button class="chip-btn" data-skx="cancel">취소</button></div>` : ''}
         <div class="sk-slots">${slots}</div>
@@ -1787,7 +1787,8 @@
         <div class="stat-line">오늘 남은 실패 ${t.failsLeft}회 · 이번 달 성과급 ${fmt(t.bonusMonth)}/${fmt(t.bonusCap)}개</div>
         <div class="small">층마다 보스 1마리 · 제한 ${G.Meta.TOWER.time}초 · 처음 깬 층마다 성과급 ${G.Meta.TOWER.floorBonus}개 + 짬 ${G.Meta.TOWER.floorJjam}개</div>
         <div class="small">영구 버프: ${G.Meta.TOWER.buffs.filter((b) => tb[b.stat]).map((b) => `${b.name} +${tb[b.stat]}%`).join(' · ') || '없음 (10층마다 하나씩)'}</div>
-        <div class="act-row"><button class="act-btn gold-btn" data-tw="go" ${t.failsLeft > 0 ? '' : 'disabled'}>${t.cur + 1}층 도전</button></div>`);
+        ${t.limitNote ? `<div class="small">${t.limitNote}</div>` : ''}
+        <div class="act-row"><button class="act-btn gold-btn" data-tw="go" ${t.failsLeft > 0 && !t.limitNote ? '' : 'disabled'}>${t.cur + 1}층 도전</button></div>`);
       $('modal-ok').textContent = '닫기';
     }
     $('modal-body').addEventListener('click', (e) => {
@@ -2251,6 +2252,12 @@
         const lockedSkill = gachaLocked();
         document.querySelectorAll('[data-pull]').forEach((b) => { setDis(b, lockedSkill || S.bonus < GA.costFor(Number(b.dataset.pull))); });
         document.querySelectorAll('[data-tpull]').forEach((b) => { setDis(b, lockedSkill || (S.petticket | 0) < Number(b.dataset.tpull)); });
+      } else if (tab === 'skill' && document.querySelector('[data-act="sk-all"]')) {
+        // 재산이 바뀌면 숙련·일괄 숙련 버튼도 바로 (2026-11-14: 숙련할 게 없으면 일괄 숙련 흐리게)
+        const list = E.skillInfo().list;
+        const can = Object.fromEntries(list.map((s) => [s.key, s.canLevel]));
+        document.querySelectorAll('[data-skup]').forEach((b) => { setDis(b, !can[b.dataset.skup]); });
+        setDis(document.querySelector('[data-act="sk-all"]'), !list.some((s) => s.canLevel));
       }
       if (detailId !== null) renderCostLive();
       if (tab !== 'grow') return;

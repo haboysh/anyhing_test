@@ -124,7 +124,7 @@
   };
   // TYPES[slot] = [{ id: 'keyboard1', slot, theme: 0~5, name, desc, subs }, ...] (테마 순서)
   const TYPES = {};
-  const TYPE_BY_ID = {};
+  const TYPE_BY_ID = Object.create(null); // 'constructor' 같은 종류 이름이 Object 함수를 꺼내지 않게 (세이브 조작, 2026-11-14)
   for (const slot of SLOT_KEYS) {
     TYPES[slot] = TYPE_TEXT[slot].map(([name, desc], i) => {
       const t = { id: slot + (i + 1), slot, theme: i, name, desc, subs: THEMES[i].subs.slice() };

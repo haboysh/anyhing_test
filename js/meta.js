@@ -151,6 +151,19 @@
       { stat: 'offline', per: 1, cap: 15, name: '방치 보상' },
     ],
   };
+  // 서버 한도 (폰도 같은 함수로 도전을 막음, 2026-11-14): 타워 n층 보스의 메인 층(mainFloor)이 평생 최고 층 + margin 안일 때만
+  //   (2026-10-29 보안 점검: 예전엔 아무 계정이나 1층부터 끝없이 보고해 짬·도장·타워 버프를 받을 수 있었음)
+  TOWER.margin = 20; // [⚖ balance-lead 확인]
+  function towerGate(n, max) {
+    const m = Number.isFinite(max) ? max : 0;
+    if (m < TOWER.unlock) return 'tower_locked';
+    if (TOWER.mainFloor(n) > m + TOWER.margin) return 'not_reached';
+    return null;
+  }
+  // 평생 최고 층 max로 도전할 수 있는 가장 높은 타워 층
+  const towerLimit = (max) => { let n = Math.max(0, Math.floor(((Number.isFinite(max) ? max : 0) + TOWER.margin - TOWER.mainFloor(0)) / 2)); while (n > 0 && towerGate(n, max)) n--; return n; };
+  // 타워 n층에 도전하려면 필요한 평생 최고 층
+  const towerNeedMax = (n) => Math.max(TOWER.unlock, TOWER.mainFloor(n) - TOWER.margin);
   const towerFresh = () => ({ month: null, cur: 0, best: 0, bonusMonth: 0, failDay: null, fails: 0 });
   // 달이 바뀌었으면 초기화 + 지난달 최고의 50%까지 소탕 → 소탕 보상 {floors, bonus, jjam}
   function towerSync(t, ms) {
@@ -253,6 +266,6 @@
     GUIDE, guideDef, guideProgress, guideServerCheck,
     ATT, PASS, STARTER, attFresh, attSync, attStatus, attClaim, attFill,
     MIS, misFresh, misSync, misTrack, misStatus, misClaim,
-    TOWER, towerFresh, towerSync, towerFloorReward, towerBuffs,
+    TOWER, towerFresh, towerSync, towerFloorReward, towerBuffs, towerGate, towerLimit, towerNeedMax,
   };
 })(globalThis.Game = globalThis.Game || {});
